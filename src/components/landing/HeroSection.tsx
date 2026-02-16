@@ -1,12 +1,23 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import HeroScene from "./HeroScene";
 
 const HeroSection = () => (
   <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-    <HeroScene />
+    {/* Spline background */}
+    <iframe
+      src="https://my.spline.design/claritystream-K3uc10VRzKOVW4sE9VhGdVYC/"
+      frameBorder="0"
+      className="absolute inset-0 w-full h-full z-0"
+      style={{ pointerEvents: "none" }}
+    />
+    
+    {/* 3D Scene overlay */}
+    <div className="absolute inset-0 z-[1]">
+      <HeroScene />
+    </div>
 
     <div className="container mx-auto px-4 relative z-10 text-center">
       <motion.div
@@ -49,14 +60,16 @@ const HeroSection = () => (
             Start Free Analysis <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
-        <Button size="lg" variant="outline" className="neon-border text-foreground hover:bg-primary/5 text-base px-8">
-          <Play className="mr-2 h-4 w-4" /> Watch Demo
-        </Button>
+        <Link to="/login">
+          <Button size="lg" variant="outline" className="neon-border text-foreground hover:bg-primary/5 text-base px-8">
+            Sign In
+          </Button>
+        </Link>
       </motion.div>
     </div>
 
     {/* Bottom gradient fade */}
-    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent z-10" />
   </section>
 );
 
