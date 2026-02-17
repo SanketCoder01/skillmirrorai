@@ -8,8 +8,12 @@ import { ResultsDisplay } from "@/components/dashboard/ResultsDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Sparkles } from "lucide-react";
+import { Routes, Route } from "react-router-dom";
+import DashboardHistory from "./DashboardHistory";
+import DashboardReports from "./DashboardReports";
+import DashboardSettings from "./DashboardSettings";
 
-const Dashboard = () => {
+const AnalysisPage = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
 
@@ -49,50 +53,59 @@ const Dashboard = () => {
   };
 
   return (
+    <>
+      <AnalysisCard onAnalyze={handleAnalyze} loading={loading} />
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center"
+          >
+            <div className="text-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                className="w-16 h-16 mx-auto mb-4"
+              >
+                <Sparkles className="w-16 h-16 text-primary" />
+              </motion.div>
+              <motion.p
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="text-lg font-display gradient-text"
+              >
+                AI is deeply analyzing your resume...
+              </motion.p>
+              <p className="text-sm text-muted-foreground mt-2">This may take a moment</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {results && (
+        <div className="mt-6">
+          <ResultsDisplay results={results} />
+        </div>
+      )}
+    </>
+  );
+};
+
+const Dashboard = () => {
+  return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
         <div className="flex-1 flex flex-col min-h-screen">
           <DashboardHeader />
           <main className="flex-1 overflow-auto p-4 md:p-6 max-w-5xl mx-auto w-full">
-            <AnalysisCard onAnalyze={handleAnalyze} loading={loading} />
-
-            {/* Loading overlay */}
-            <AnimatePresence>
-              {loading && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center"
-                >
-                  <div className="text-center">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                      className="w-16 h-16 mx-auto mb-4"
-                    >
-                      <Sparkles className="w-16 h-16 text-primary" />
-                    </motion.div>
-                    <motion.p
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ repeat: Infinity, duration: 2 }}
-                      className="text-lg font-display gradient-text"
-                    >
-                      AI is deeply analyzing your resume...
-                    </motion.p>
-                    <p className="text-sm text-muted-foreground mt-2">This may take a moment</p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Results */}
-            {results && (
-              <div className="mt-6">
-                <ResultsDisplay results={results} />
-              </div>
-            )}
+            <Routes>
+              <Route index element={<AnalysisPage />} />
+              <Route path="history" element={<DashboardHistory />} />
+              <Route path="reports" element={<DashboardReports />} />
+              <Route path="settings" element={<DashboardSettings />} />
+            </Routes>
           </main>
         </div>
       </div>

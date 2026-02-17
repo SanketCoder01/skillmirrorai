@@ -29,13 +29,8 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Spline background */}
-      <iframe
-        src="https://my.spline.design/claritystream-K3uc10VRzKOVW4sE9VhGdVYC/"
-        frameBorder="0"
-        className="absolute inset-0 w-full h-full z-0"
-        style={{ pointerEvents: "none" }}
-      />
+      {/* Gradient background */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-background" />
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="glass-card p-8 w-full max-w-md">
           <div className="text-center mb-8">

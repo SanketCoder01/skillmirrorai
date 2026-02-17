@@ -1,6 +1,6 @@
-import { LayoutDashboard, History, FileText, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, History, FileText, Settings, LogOut, HelpCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,7 @@ const items = [
   { title: "History", url: "/dashboard/history", icon: History },
   { title: "Reports", url: "/dashboard/reports", icon: FileText },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
+  { title: "Help", url: "/dashboard/settings", icon: HelpCircle },
 ];
 
 export function DashboardSidebar() {

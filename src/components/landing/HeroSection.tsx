@@ -6,15 +6,8 @@ import HeroScene from "./HeroScene";
 
 const HeroSection = () => (
   <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-    {/* Spline background */}
-    <iframe
-      src="https://my.spline.design/claritystream-K3uc10VRzKOVW4sE9VhGdVYC/"
-      frameBorder="0"
-      className="absolute inset-0 w-full h-full z-0"
-      style={{ pointerEvents: "none" }}
-    />
-    
-    {/* 3D Scene overlay */}
+    {/* Gradient background */}
+    <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-background" />
     <div className="absolute inset-0 z-[1]">
       <HeroScene />
     </div>
