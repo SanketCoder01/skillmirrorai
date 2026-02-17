@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, Linkedin, Instagram } from "lucide-react";
 
 const Footer = () => (
   <footer className="border-t border-border/30 bg-card/20 py-12">
@@ -11,6 +11,14 @@ const Footer = () => (
         <p className="text-sm text-muted-foreground">
           © 2026 SkillMirror AI. Your Intelligent Career Copilot.
         </p>
+        <div className="flex items-center gap-3">
+          <a href="https://www.linkedin.com/in/sanket-gaikwad-50134a314/" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+            <Linkedin className="h-5 w-5" />
+          </a>
+          <a href="https://www.instagram.com/mr.sanketgofficial" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+            <Instagram className="h-5 w-5" />
+          </a>
+        </div>
       </div>
     </div>
   </footer>
