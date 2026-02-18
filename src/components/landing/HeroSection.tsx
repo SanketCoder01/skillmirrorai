@@ -2,15 +2,11 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import HeroScene from "./HeroScene";
+import SplineBackground from "@/components/SplineBackground";
 
 const HeroSection = () => (
   <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-    {/* Gradient background */}
-    <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-background" />
-    <div className="absolute inset-0 z-[1]">
-      <HeroScene />
-    </div>
+    <SplineBackground />
 
     <div className="container mx-auto px-4 relative z-10 text-center">
       <motion.div

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import SplineBackground from "@/components/SplineBackground";
 
 const Register = () => {
   const [displayName, setDisplayName] = useState("");
@@ -35,7 +36,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-background" />
+      <SplineBackground />
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="glass-card p-8 w-full max-w-md">
           <div className="text-center mb-8">
