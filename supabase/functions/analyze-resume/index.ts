@@ -74,7 +74,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
         "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "",
       },
       body: JSON.stringify({
-        model: "qwen/qwen3-4b:free",
+        model: "openai/gpt-oss-120b:free",
         messages: [
           { role: "system", content: "You are a career analysis AI. Return ONLY valid JSON. No markdown formatting." },
           { role: "user", content: prompt },
