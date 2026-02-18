@@ -19,8 +19,10 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error("Unauthorized");
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !data?.claims) throw new Error("Unauthorized");
+    const userId = data.claims.sub as string;
 
     const { resumeText, jobDescription, targetRole, location } = await req.json();
 
@@ -112,7 +114,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 
     // Save to database
     const { error: insertError } = await supabase.from("analyses").insert({
-      user_id: user.id,
+      user_id: userId,
       resume_text: resumeText?.substring(0, 5000),
       job_description: jobDescription?.substring(0, 3000),
       target_role: targetRole,
