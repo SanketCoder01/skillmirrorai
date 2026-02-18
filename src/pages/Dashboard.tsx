@@ -12,6 +12,8 @@ import { Routes, Route } from "react-router-dom";
 import DashboardHistory from "./DashboardHistory";
 import DashboardReports from "./DashboardReports";
 import DashboardSettings from "./DashboardSettings";
+import DashboardATS from "./DashboardATS";
+import DashboardRewriter from "./DashboardRewriter";
 
 const AnalysisPage = () => {
   const [loading, setLoading] = useState(false);
@@ -102,6 +104,8 @@ const Dashboard = () => {
           <main className="flex-1 overflow-auto p-4 md:p-6 max-w-5xl mx-auto w-full">
             <Routes>
               <Route index element={<AnalysisPage />} />
+              <Route path="ats" element={<DashboardATS />} />
+              <Route path="rewriter" element={<DashboardRewriter />} />
               <Route path="history" element={<DashboardHistory />} />
               <Route path="reports" element={<DashboardReports />} />
               <Route path="settings" element={<DashboardSettings />} />

@@ -2,3 +2,9 @@ project_id = "uxfygdwhkfruygmwlpzi"
 
 [functions.analyze-resume]
 verify_jwt = false
+
+[functions.ats-analyzer]
+verify_jwt = false
+
+[functions.rewrite-resume]
+verify_jwt = false
