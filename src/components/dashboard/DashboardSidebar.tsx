@@ -1,4 +1,4 @@
-import { LayoutDashboard, History, FileText, Settings, LogOut, HelpCircle } from "lucide-react";
+import { LayoutDashboard, History, FileText, Settings, LogOut, HelpCircle, ShieldCheck, PenTool } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,10 +16,11 @@ import { NavLink } from "@/components/NavLink";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "ATS Analyzer", url: "/dashboard/ats", icon: ShieldCheck },
+  { title: "Resume Optimizer", url: "/dashboard/rewriter", icon: PenTool },
   { title: "History", url: "/dashboard/history", icon: History },
   { title: "Reports", url: "/dashboard/reports", icon: FileText },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
-  { title: "Help", url: "/dashboard/settings", icon: HelpCircle },
 ];
 
 export function DashboardSidebar() {
