@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import SplineBackground from "@/components/SplineBackground";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -29,8 +30,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Gradient background */}
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-background" />
+      <SplineBackground />
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="glass-card p-8 w-full max-w-md">
           <div className="text-center mb-8">
