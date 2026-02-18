@@ -24,8 +24,8 @@ serve(async (req) => {
 
     const { resumeText, jobDescription, targetRole, location } = await req.json();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
     const prompt = `You are an expert career analyst AI. Analyze the following resume against the job description provided.
 
@@ -64,14 +64,15 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
   "riskFactors": ["risk1", "risk2"]
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash-preview",
         messages: [
           { role: "system", content: "You are a career analysis AI. Return ONLY valid JSON. No markdown formatting." },
           { role: "user", content: prompt },
