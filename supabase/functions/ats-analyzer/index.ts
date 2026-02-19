@@ -19,9 +19,8 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !data?.claims) throw new Error("Unauthorized");
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error("Unauthorized");
 
     const { resumeText, targetRole } = await req.json();
     if (!resumeText) throw new Error("Resume text is required");
@@ -35,13 +34,7 @@ serve(async (req) => {
 Resume Text:
 ${resumeText}
 
-Perform a thorough ATS analysis:
-1. Score the resume against common ATS systems for the "${targetRole}" role
-2. Identify matching keywords/skills that ATS would pick up
-3. Identify missing critical keywords for this role
-4. Find irrelevant content that should be removed
-5. Analyze skill density and keyword optimization
-6. Provide specific improvement tips
+Perform a thorough ATS analysis and provide a real, accurate ATS compatibility score based on how well this resume matches the "${targetRole}" role. The score must reflect actual keyword matches, skill alignment, and formatting compatibility with real ATS systems.
 
 Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 {
@@ -67,7 +60,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       body: JSON.stringify({
         model: "openai/gpt-oss-120b:free",
         messages: [
-          { role: "system", content: "You are an ATS analysis expert. Return ONLY valid JSON. No markdown formatting." },
+          { role: "system", content: "You are an ATS analysis expert. Return ONLY valid JSON. No markdown formatting. Use simple, clear professional language." },
           { role: "user", content: prompt },
         ],
       }),
