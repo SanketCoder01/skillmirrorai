@@ -19,9 +19,8 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !data?.claims) throw new Error("Unauthorized");
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error("Unauthorized");
 
     const { resumeText, jobDescription } = await req.json();
     if (!resumeText) throw new Error("Resume text is required");
@@ -36,7 +35,8 @@ IMPORTANT RULES:
 - Do NOT add fake experience or skills the candidate doesn't have
 - Only optimize and rephrase existing content
 - Add relevant keywords naturally from the job description
-- Keep language simple and professional
+- Keep language SIMPLE and EASY TO READ - avoid complex words
+- Use clear, professional but simple English
 - Remove irrelevant content that doesn't match the job
 
 Resume Text:
@@ -47,12 +47,12 @@ ${jobDescription}
 
 Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 {
-  "optimized_summary": "A rewritten professional summary optimized for this job",
+  "optimized_summary": "A rewritten professional summary optimized for this job in simple language",
   "optimized_skills": ["Skill 1 (reordered/rephrased)", "Skill 2"],
   "optimized_experience": [
     {
       "original": "Original bullet point from resume",
-      "optimized": "Rewritten bullet point with relevant keywords and metrics"
+      "optimized": "Rewritten bullet point with relevant keywords and metrics in simple language"
     }
   ],
   "added_keywords": ["keyword1", "keyword2"],
@@ -74,7 +74,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       body: JSON.stringify({
         model: "openai/gpt-oss-120b:free",
         messages: [
-          { role: "system", content: "You are a resume optimization expert. Return ONLY valid JSON. No markdown formatting." },
+          { role: "system", content: "You are a resume optimization expert. Return ONLY valid JSON. No markdown formatting. Always use simple, clear, easy-to-read language." },
           { role: "user", content: prompt },
         ],
       }),

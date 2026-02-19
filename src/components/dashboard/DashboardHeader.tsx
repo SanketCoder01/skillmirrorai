@@ -1,5 +1,5 @@
 import { Bell, Moon, Sun, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,21 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export function DashboardHeader() {
   const { profile } = useAuth();
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("theme");
+    return saved ? saved === "dark" : true;
+  });
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    }
+    localStorage.setItem("theme", dark ? "dark" : "light");
+  }, [dark]);
 
   return (
     <header className="h-14 border-b border-border/30 bg-card/40 backdrop-blur-xl flex items-center justify-between px-4 sticky top-0 z-40">
@@ -19,7 +33,7 @@ export function DashboardHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => setDark(!dark)} className="text-muted-foreground">
+        <Button variant="ghost" size="icon" onClick={() => setDark(!dark)} className="text-muted-foreground" title={dark ? "Switch to light mode" : "Switch to dark mode"}>
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         <Button variant="ghost" size="icon" className="text-muted-foreground relative">

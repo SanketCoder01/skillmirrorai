@@ -1,4 +1,4 @@
-import { LayoutDashboard, History, FileText, Settings, LogOut, HelpCircle, ShieldCheck, PenTool } from "lucide-react";
+import { LayoutDashboard, History, FileText, Settings, LogOut, ShieldCheck, PenTool } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -9,14 +9,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "ATS Analyzer", url: "/dashboard/ats", icon: ShieldCheck },
+  { title: "ATS Score", url: "/dashboard/ats", icon: ShieldCheck },
   { title: "Resume Optimizer", url: "/dashboard/rewriter", icon: PenTool },
   { title: "History", url: "/dashboard/history", icon: History },
   { title: "Reports", url: "/dashboard/reports", icon: FileText },
@@ -30,6 +29,9 @@ export function DashboardSidebar() {
   const collapsed = state === "collapsed";
 
   const handleLogout = async () => {
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark");
+    localStorage.setItem("theme", "dark");
     await signOut();
     navigate("/");
   };

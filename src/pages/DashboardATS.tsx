@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileText, Sparkles, ShieldCheck, CheckCircle, XCircle, AlertTriangle, Trash2 } from "lucide-react";
+import { Upload, FileText, Sparkles, ShieldCheck, CheckCircle, XCircle, AlertTriangle, Trash2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { ScoreCircle } from "@/components/dashboard/ScoreCircle";
+import { useAuth } from "@/contexts/AuthContext";
+import jsPDF from "jspdf";
 
 const TARGET_ROLES = [
   "Full Stack Developer",
@@ -24,13 +26,211 @@ const TARGET_ROLES = [
   "Cybersecurity",
 ];
 
+function cleanText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/[#\-*_~`>]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[^\x20-\x7E\n]/g, "")
+    .trim();
+}
+
+function generateATSReport(results: any, targetRole: string, userName: string, userEmail: string) {
+  const doc = new jsPDF();
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 0;
+  const c = {
+    primary: [0, 180, 216] as [number, number, number],
+    dark: [20, 25, 45] as [number, number, number],
+    text: [55, 65, 81] as [number, number, number],
+    light: [243, 244, 246] as [number, number, number],
+    green: [34, 197, 94] as [number, number, number],
+    red: [239, 68, 68] as [number, number, number],
+    purple: [139, 92, 246] as [number, number, number],
+  };
+
+  const check = (n: number) => { if (y + n > 275) { doc.addPage(); y = 20; } };
+
+  const heading = (title: string) => {
+    check(16);
+    doc.setFillColor(...c.primary);
+    doc.rect(20, y, 4, 8, "F");
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...c.dark);
+    doc.text(title, 28, y + 6);
+    y += 14;
+  };
+
+  const para = (text: string, size = 9, color = c.text, bold = false, indent = 20) => {
+    check(8);
+    const clean = cleanText(text);
+    doc.setFontSize(size);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(...color);
+    const lines = doc.splitTextToSize(clean, pw - indent - 20);
+    doc.text(lines, indent, y);
+    y += lines.length * (size * 0.45) + 3;
+  };
+
+  const bullet = (text: string, color = c.text) => {
+    check(8);
+    const clean = cleanText(text);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...c.text);
+    doc.text("\u2022", 24, y);
+    const lines = doc.splitTextToSize(clean, pw - 52);
+    doc.text(lines, 30, y);
+    y += lines.length * 4.5 + 2;
+  };
+
+  // Header
+  doc.setFillColor(...c.dark);
+  doc.rect(0, 0, pw, 45, "F");
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text("SkillMirror AI", 20, 18);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 200, 220);
+  doc.text("ATS Score Analysis Report", 20, 26);
+  doc.setFontSize(8);
+  doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, 20, 34);
+  doc.text("www.skillmirror.ai", pw - 50, 34);
+  y = 55;
+
+  // User info
+  doc.setFillColor(...c.light);
+  doc.roundedRect(20, y, pw - 40, 16, 3, 3, "F");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...c.dark);
+  doc.text(`Candidate: ${userName}`, 26, y + 6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Email: ${userEmail}`, 26, y + 12);
+  doc.text(`Target Role: ${targetRole}`, pw / 2, y + 6);
+  y += 24;
+
+  // ATS Score
+  doc.setFontSize(28);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...c.primary);
+  doc.text(`${results.ats_score}%`, pw / 2, y + 10, { align: "center" });
+  doc.setFontSize(10);
+  doc.setTextColor(...c.text);
+  doc.text("ATS Compatibility Score", pw / 2, y + 18, { align: "center" });
+  y += 28;
+
+  if (results.summary_feedback) {
+    heading("Summary Feedback");
+    para(results.summary_feedback);
+    y += 4;
+  }
+
+  if (results.matching_skills?.length) {
+    heading("Matching Keywords");
+    results.matching_skills.forEach((s: string) => bullet(s, c.green));
+    y += 4;
+  }
+
+  if (results.missing_skills?.length) {
+    heading("Missing Keywords");
+    results.missing_skills.forEach((s: string) => bullet(s, c.red));
+    y += 4;
+  }
+
+  if (results.remove_suggestions?.length) {
+    heading("Consider Removing");
+    results.remove_suggestions.forEach((s: string) => bullet(s, c.red));
+    y += 4;
+  }
+
+  if (results.weak_sections?.length) {
+    heading("Weak Sections");
+    results.weak_sections.forEach((s: string) => bullet(s));
+    y += 4;
+  }
+
+  if (results.improvement_tips?.length) {
+    heading("Improvement Tips");
+    results.improvement_tips.forEach((s: string) => bullet(s, c.primary));
+    y += 4;
+  }
+
+  if (results.formatting_issues?.length) {
+    heading("Formatting Issues");
+    results.formatting_issues.forEach((s: string) => bullet(s));
+    y += 4;
+  }
+
+  if (results.section_scores) {
+    heading("Section Scores");
+    Object.entries(results.section_scores).forEach(([key, val]) => {
+      para(`${key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}: ${val}%`, 9, c.dark, true, 28);
+    });
+    y += 4;
+  }
+
+  // Footer
+  const tp = doc.getNumberOfPages();
+  for (let i = 1; i <= tp; i++) {
+    doc.setPage(i);
+    doc.setFillColor(...c.dark);
+    doc.rect(0, 285, pw, 12, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(180, 200, 220);
+    doc.text("SkillMirror AI  |  Powered by Advanced AI  |  www.skillmirror.ai", 20, 291);
+    doc.text(`Page ${i} of ${tp}`, pw - 35, 291);
+  }
+
+  doc.save(`SkillMirror-ATS-Report-${targetRole}.pdf`);
+}
+
+const PROGRESS_STEPS = [
+  { pct: 10, msg: "Parsing resume text..." },
+  { pct: 25, msg: "Extracting keywords..." },
+  { pct: 40, msg: "Matching against ATS templates..." },
+  { pct: 55, msg: "Analyzing skill density..." },
+  { pct: 70, msg: "Evaluating section scores..." },
+  { pct: 85, msg: "Generating recommendations..." },
+  { pct: 95, msg: "Finalizing results..." },
+];
+
 const DashboardATS = () => {
+  const { profile } = useAuth();
   const [resumeText, setResumeText] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [customRole, setCustomRole] = useState("");
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [progress, setProgress] = useState(0);
+  const [progressMsg, setProgressMsg] = useState("");
+  const progressRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startProgress = () => {
+    setProgress(0);
+    setProgressMsg(PROGRESS_STEPS[0].msg);
+    let step = 0;
+    progressRef.current = setInterval(() => {
+      step++;
+      if (step < PROGRESS_STEPS.length) {
+        setProgress(PROGRESS_STEPS[step].pct);
+        setProgressMsg(PROGRESS_STEPS[step].msg);
+      }
+    }, 3000);
+  };
+
+  const stopProgress = () => {
+    if (progressRef.current) clearInterval(progressRef.current);
+    setProgress(100);
+    setProgressMsg("Complete!");
+  };
+
+  useEffect(() => { return () => { if (progressRef.current) clearInterval(progressRef.current); }; }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (file.type !== "application/pdf") { alert("Please upload a PDF file"); return; }
@@ -60,6 +260,7 @@ const DashboardATS = () => {
 
     setLoading(true);
     setResults(null);
+    startProgress();
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { toast({ title: "Error", description: "Please sign in first", variant: "destructive" }); return; }
@@ -72,15 +273,29 @@ const DashboardATS = () => {
 
       if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || "Analysis failed"); }
       const { results: r } = await resp.json();
+      stopProgress();
       setResults(r);
-      toast({ title: "ATS Analysis Complete!", description: `ATS Score: ${r.ats_score}%` });
+      toast({ title: "ATS Analysis Complete!", description: `Your ATS Score: ${r.ats_score}%` });
+
+      // Send notification
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("SkillMirror AI", { body: `ATS Analysis Complete! Score: ${r.ats_score}%` });
+      }
     } catch (e: any) {
+      stopProgress();
       console.error(e);
       toast({ title: "Analysis Failed", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -134,16 +349,17 @@ const DashboardATS = () => {
         </Button>
       </motion.div>
 
-      {/* Loading overlay */}
+      {/* Loading overlay with progress */}
       <AnimatePresence>
         {loading && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center">
-            <div className="text-center">
+            <div className="text-center w-80">
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="w-16 h-16 mx-auto mb-4">
                 <Sparkles className="w-16 h-16 text-primary" />
               </motion.div>
-              <motion.p animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 2 }} className="text-lg font-display gradient-text">Scanning resume against ATS systems...</motion.p>
-              <p className="text-sm text-muted-foreground mt-2">This may take a moment</p>
+              <Progress value={progress} className="h-2 mb-3" />
+              <p className="text-sm font-medium text-primary">{progress}%</p>
+              <motion.p key={progressMsg} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-muted-foreground mt-1">{progressMsg}</motion.p>
             </div>
           </motion.div>
         )}
@@ -212,7 +428,7 @@ const DashboardATS = () => {
           {results.weak_sections?.length > 0 && (
             <div className="glass-card p-6">
               <h3 className="font-display font-bold mb-3 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-secondary" /> Weak Sections</h3>
-              <ul className="space-y-2">{results.weak_sections.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground">⚠ {s}</li>)}</ul>
+              <ul className="space-y-2">{results.weak_sections.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span>⚠</span>{s}</li>)}</ul>
             </div>
           )}
 
@@ -231,6 +447,24 @@ const DashboardATS = () => {
               <p className="text-sm text-muted-foreground">{results.summary_feedback}</p>
             </div>
           )}
+
+          {/* Whitespace notice */}
+          <div className="glass-card p-4 bg-muted/20">
+            <p className="text-xs text-muted-foreground text-center italic">
+              Clean and normalize whitespace before rendering the PDF. Remove hidden characters and ensure proper UTF-8 formatting.
+            </p>
+          </div>
+
+          {/* PDF Export */}
+          <div className="text-center">
+            <Button
+              onClick={() => generateATSReport(results, targetRole === "Other" ? customRole : targetRole, profile?.display_name || "User", profile?.email || "")}
+              size="lg"
+              className="btn-glow bg-primary text-primary-foreground"
+            >
+              <Download className="h-4 w-4 mr-2" /> Download ATS Report PDF
+            </Button>
+          </div>
         </motion.div>
       )}
     </div>
