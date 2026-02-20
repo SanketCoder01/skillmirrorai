@@ -22,7 +22,6 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) throw new Error("Unauthorized");
-    const userId = claimsData.claims.sub;
 
     const { resumeText, jobDescription } = await req.json();
     if (!resumeText) throw new Error("Resume text is required");
@@ -31,15 +30,23 @@ serve(async (req) => {
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
-    const prompt = `You are an expert resume optimization specialist. Rewrite and optimize the following resume to match the given job description.
+    const prompt = `You are a SENIOR RESUME OPTIMIZATION SPECIALIST who thinks like a professional recruiter.
 
-IMPORTANT RULES:
-- Do NOT add fake experience or skills the candidate doesn't have
-- Only optimize and rephrase existing content
-- Add relevant keywords naturally from the job description
-- Keep language SIMPLE and EASY TO READ - avoid complex words
-- Use clear, professional but simple English
-- Remove irrelevant content that doesn't match the job
+CRITICAL RULES - READ CAREFULLY:
+1. Do NOT add fake experience or skills the candidate doesn't have
+2. Only optimize and rephrase EXISTING content
+3. If a section is ALREADY STRONG, say so. Do NOT suggest unnecessary changes
+4. Use SIMPLE, EASY-TO-READ language. No complex vocabulary
+5. Think like a recruiter: what changes would actually move this resume from "maybe" to "interview"?
+6. Be specific. "Add metrics" is generic. "Change 'managed team' to 'Led 8-person development team delivering 3 projects ahead of schedule'" is specific
+7. Only suggest improvements that would increase resume strength by 10%+ 
+8. Remove irrelevant content that doesn't match the job description
+
+SMART FILTERING RULES:
+- If summary already targets the role well → say "Your summary is well-aligned. No major changes needed."
+- If experience bullets already have metrics → don't suggest adding metrics to those bullets
+- If skills section already matches job keywords → acknowledge it, don't suggest redundant additions
+- Focus ONLY on what genuinely needs improvement
 
 Resume Text:
 ${resumeText}
@@ -47,23 +54,23 @@ ${resumeText}
 Job Description:
 ${jobDescription}
 
-Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
+Return ONLY valid JSON (no markdown, no code fences):
 {
-  "optimized_summary": "A rewritten professional summary optimized for this job in simple language",
-  "optimized_skills": ["Skill 1 (reordered/rephrased)", "Skill 2"],
+  "optimized_summary": "A rewritten professional summary in simple, clear language. Or 'Your current summary is strong and well-aligned with this role.' if already good",
+  "optimized_skills": ["Skill 1 (reordered/rephrased for relevance)", "Skill 2"],
   "optimized_experience": [
     {
       "original": "Original bullet point from resume",
-      "optimized": "Rewritten bullet point with relevant keywords and metrics in simple language"
+      "optimized": "Rewritten with relevant keywords and metrics in simple language. If already strong, write 'No change needed - already well-written'"
     }
   ],
   "added_keywords": ["keyword1", "keyword2"],
   "removed_content": ["Irrelevant item 1", "Irrelevant item 2"],
-  "missing_from_resume": ["Critical gap 1", "Critical gap 2"],
+  "missing_from_resume": ["Critical gap 1 - specific and actionable"],
   "optimization_score": {"before": 55, "after": 82},
-  "tone_feedback": "The resume now uses stronger action verbs and includes measurable outcomes.",
-  "additional_tips": ["Tip 1", "Tip 2"],
-  "full_optimized_resume": "The complete rewritten resume text in clean format without any markdown"
+  "tone_feedback": "Professional, specific feedback about the overall tone and impact",
+  "additional_tips": ["Only actionable, specific tips that make real difference"],
+  "full_optimized_resume": "The complete rewritten resume text in clean format without any markdown. Use simple professional language throughout."
 }`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -76,7 +83,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       body: JSON.stringify({
         model: "openai/gpt-oss-120b:free",
         messages: [
-          { role: "system", content: "You are a resume optimization expert. Return ONLY valid JSON. No markdown formatting. Always use simple, clear, easy-to-read language." },
+          { role: "system", content: "You are a senior resume optimization specialist. Think like a recruiter. Return ONLY valid JSON. No markdown. Use simple, clear, easy-to-read language. Do NOT suggest changes when content is already strong. Be specific, not generic." },
           { role: "user", content: prompt },
         ],
       }),

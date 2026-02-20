@@ -22,7 +22,6 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) throw new Error("Unauthorized");
-    const userId = claimsData.claims.sub;
 
     const { resumeText, targetRole } = await req.json();
     if (!resumeText) throw new Error("Resume text is required");
@@ -31,23 +30,36 @@ serve(async (req) => {
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
-    const prompt = `You are an expert ATS (Applicant Tracking System) analyzer. Analyze the following resume specifically for the role of "${targetRole}".
+    const prompt = `You are a SENIOR TECHNICAL RECRUITER with 15+ years of experience and deep expertise in ATS (Applicant Tracking System) analysis.
+
+Analyze the following resume SPECIFICALLY for the role of "${targetRole}".
 
 Resume Text:
 ${resumeText}
 
-Perform a thorough ATS analysis and provide a real, accurate ATS compatibility score based on how well this resume matches the "${targetRole}" role. The score must reflect actual keyword matches, skill alignment, and formatting compatibility with real ATS systems.
+CRITICAL INSTRUCTIONS:
+1. Calculate a REAL, ACCURATE ATS score based on actual keyword matching against the "${targetRole}" role requirements
+2. Do NOT give inflated scores. Be honest and precise like a real ATS system would be
+3. Compare against actual industry-standard skill requirements for "${targetRole}"
+4. Analyze each section independently: summary, skills, experience, education, formatting
+5. Think like a recruiter: what would make you reject or shortlist this resume?
 
-Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
+SCORING RULES:
+- Count exact keyword matches vs required keywords for "${targetRole}"
+- Penalize for: missing critical skills, poor formatting, lack of quantification, irrelevant content
+- Reward for: strong action verbs, quantified achievements, role-aligned keywords, clean formatting
+- ATS score must reflect REAL compatibility, not encouragement
+
+Return ONLY valid JSON (no markdown, no code fences):
 {
   "ats_score": 72,
   "matching_skills": ["React", "Node.js", "TypeScript"],
   "missing_skills": ["Docker", "REST API", "CI/CD"],
-  "remove_suggestions": ["IoT experiments (irrelevant for this role)", "Unrelated hobby projects"],
+  "remove_suggestions": ["IoT experiments (irrelevant for ${targetRole})", "Unrelated hobby projects"],
   "improvement_tips": ["Add measurable achievements with numbers", "Include more role-specific keywords in summary", "Use action verbs at the start of bullet points"],
-  "summary_feedback": "Your resume needs more backend-specific keywords and quantifiable achievements.",
-  "weak_sections": ["Summary is too generic", "Skills section lacks organization"],
-  "keyword_density": {"present": 65, "optimal": 85, "suggestion": "Add 8-10 more relevant keywords"},
+  "summary_feedback": "Specific, actionable feedback about this resume's ATS compatibility for ${targetRole}. Be direct and professional.",
+  "weak_sections": ["Summary is too generic for ${targetRole}", "Skills section lacks organization"],
+  "keyword_density": {"present": 65, "optimal": 85, "suggestion": "Add 8-10 more relevant keywords for ${targetRole}"},
   "formatting_issues": ["Use consistent date format", "Add more white space between sections"],
   "section_scores": {"summary": 60, "skills": 75, "experience": 70, "education": 80, "overall_format": 65}
 }`;
@@ -62,7 +74,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       body: JSON.stringify({
         model: "openai/gpt-oss-120b:free",
         messages: [
-          { role: "system", content: "You are an ATS analysis expert. Return ONLY valid JSON. No markdown formatting. Use simple, clear professional language." },
+          { role: "system", content: "You are a senior technical recruiter and ATS analysis expert. You give REAL scores, not inflated ones. You think like an actual ATS system. Return ONLY valid JSON. No markdown formatting. Use simple, clear professional language." },
           { role: "user", content: prompt },
         ],
       }),
