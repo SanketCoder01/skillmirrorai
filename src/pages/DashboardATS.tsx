@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { ScoreCircle } from "@/components/dashboard/ScoreCircle";
 import { useAuth } from "@/contexts/AuthContext";
-import jsPDF from "jspdf";
+import { generateATSReport } from "@/lib/pdf-generator";
 
 const TARGET_ROLES = [
   "Full Stack Developer",
@@ -26,178 +26,26 @@ const TARGET_ROLES = [
   "Cybersecurity",
 ];
 
-function cleanText(text: string): string {
-  if (!text) return "";
-  return text
-    .replace(/[#\-*_~`>]/g, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\x20-\x7E\n]/g, "")
-    .trim();
-}
-
-function generateATSReport(results: any, targetRole: string, userName: string, userEmail: string) {
-  const doc = new jsPDF();
-  const pw = doc.internal.pageSize.getWidth();
-  let y = 0;
-  const c = {
-    primary: [0, 180, 216] as [number, number, number],
-    dark: [20, 25, 45] as [number, number, number],
-    text: [55, 65, 81] as [number, number, number],
-    light: [243, 244, 246] as [number, number, number],
-    green: [34, 197, 94] as [number, number, number],
-    red: [239, 68, 68] as [number, number, number],
-    purple: [139, 92, 246] as [number, number, number],
-  };
-
-  const check = (n: number) => { if (y + n > 275) { doc.addPage(); y = 20; } };
-
-  const heading = (title: string) => {
-    check(16);
-    doc.setFillColor(...c.primary);
-    doc.rect(20, y, 4, 8, "F");
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...c.dark);
-    doc.text(title, 28, y + 6);
-    y += 14;
-  };
-
-  const para = (text: string, size = 9, color = c.text, bold = false, indent = 20) => {
-    check(8);
-    const clean = cleanText(text);
-    doc.setFontSize(size);
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setTextColor(...color);
-    const lines = doc.splitTextToSize(clean, pw - indent - 20);
-    doc.text(lines, indent, y);
-    y += lines.length * (size * 0.45) + 3;
-  };
-
-  const bullet = (text: string, color = c.text) => {
-    check(8);
-    const clean = cleanText(text);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...c.text);
-    doc.text("\u2022", 24, y);
-    const lines = doc.splitTextToSize(clean, pw - 52);
-    doc.text(lines, 30, y);
-    y += lines.length * 4.5 + 2;
-  };
-
-  // Header
-  doc.setFillColor(...c.dark);
-  doc.rect(0, 0, pw, 45, "F");
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text("SkillMirror AI", 20, 18);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(180, 200, 220);
-  doc.text("ATS Score Analysis Report", 20, 26);
-  doc.setFontSize(8);
-  doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, 20, 34);
-  doc.text("www.skillmirror.ai", pw - 50, 34);
-  y = 55;
-
-  // User info
-  doc.setFillColor(...c.light);
-  doc.roundedRect(20, y, pw - 40, 16, 3, 3, "F");
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...c.dark);
-  doc.text(`Candidate: ${userName}`, 26, y + 6);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`Email: ${userEmail}`, 26, y + 12);
-  doc.text(`Target Role: ${targetRole}`, pw / 2, y + 6);
-  y += 24;
-
-  // ATS Score
-  doc.setFontSize(28);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...c.primary);
-  doc.text(`${results.ats_score}%`, pw / 2, y + 10, { align: "center" });
-  doc.setFontSize(10);
-  doc.setTextColor(...c.text);
-  doc.text("ATS Compatibility Score", pw / 2, y + 18, { align: "center" });
-  y += 28;
-
-  if (results.summary_feedback) {
-    heading("Summary Feedback");
-    para(results.summary_feedback);
-    y += 4;
-  }
-
-  if (results.matching_skills?.length) {
-    heading("Matching Keywords");
-    results.matching_skills.forEach((s: string) => bullet(s, c.green));
-    y += 4;
-  }
-
-  if (results.missing_skills?.length) {
-    heading("Missing Keywords");
-    results.missing_skills.forEach((s: string) => bullet(s, c.red));
-    y += 4;
-  }
-
-  if (results.remove_suggestions?.length) {
-    heading("Consider Removing");
-    results.remove_suggestions.forEach((s: string) => bullet(s, c.red));
-    y += 4;
-  }
-
-  if (results.weak_sections?.length) {
-    heading("Weak Sections");
-    results.weak_sections.forEach((s: string) => bullet(s));
-    y += 4;
-  }
-
-  if (results.improvement_tips?.length) {
-    heading("Improvement Tips");
-    results.improvement_tips.forEach((s: string) => bullet(s, c.primary));
-    y += 4;
-  }
-
-  if (results.formatting_issues?.length) {
-    heading("Formatting Issues");
-    results.formatting_issues.forEach((s: string) => bullet(s));
-    y += 4;
-  }
-
-  if (results.section_scores) {
-    heading("Section Scores");
-    Object.entries(results.section_scores).forEach(([key, val]) => {
-      para(`${key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}: ${val}%`, 9, c.dark, true, 28);
-    });
-    y += 4;
-  }
-
-  // Footer
-  const tp = doc.getNumberOfPages();
-  for (let i = 1; i <= tp; i++) {
-    doc.setPage(i);
-    doc.setFillColor(...c.dark);
-    doc.rect(0, 285, pw, 12, "F");
-    doc.setFontSize(7);
-    doc.setTextColor(180, 200, 220);
-    doc.text("SkillMirror AI  |  Powered by Advanced AI  |  www.skillmirror.ai", 20, 291);
-    doc.text(`Page ${i} of ${tp}`, pw - 35, 291);
-  }
-
-  doc.save(`SkillMirror-ATS-Report-${targetRole}.pdf`);
-}
-
 const PROGRESS_STEPS = [
-  { pct: 10, msg: "Parsing resume text..." },
-  { pct: 25, msg: "Extracting keywords..." },
-  { pct: 40, msg: "Matching against ATS templates..." },
-  { pct: 55, msg: "Analyzing skill density..." },
-  { pct: 70, msg: "Evaluating section scores..." },
-  { pct: 85, msg: "Generating recommendations..." },
-  { pct: 95, msg: "Finalizing results..." },
+  { pct: 5, msg: "Initializing analysis..." },
+  { pct: 12, msg: "Parsing resume text..." },
+  { pct: 22, msg: "Extracting keywords..." },
+  { pct: 32, msg: "Loading ATS templates..." },
+  { pct: 42, msg: "Matching against role requirements..." },
+  { pct: 52, msg: "Analyzing skill density..." },
+  { pct: 62, msg: "Evaluating section quality..." },
+  { pct: 72, msg: "Scoring formatting..." },
+  { pct: 82, msg: "Generating recommendations..." },
+  { pct: 90, msg: "Compiling final report..." },
+  { pct: 95, msg: "Almost done..." },
 ];
+
+const fadeUp = (i: number) => ({
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-50px" },
+  transition: { duration: 0.5, delay: i * 0.08 },
+});
 
 const DashboardATS = () => {
   const { profile } = useAuth();
@@ -209,10 +57,10 @@ const DashboardATS = () => {
   const [results, setResults] = useState<any>(null);
   const [progress, setProgress] = useState(0);
   const [progressMsg, setProgressMsg] = useState("");
-  const progressRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startProgress = () => {
-    setProgress(0);
+    setProgress(PROGRESS_STEPS[0].pct);
     setProgressMsg(PROGRESS_STEPS[0].msg);
     let step = 0;
     progressRef.current = setInterval(() => {
@@ -221,7 +69,7 @@ const DashboardATS = () => {
         setProgress(PROGRESS_STEPS[step].pct);
         setProgressMsg(PROGRESS_STEPS[step].msg);
       }
-    }, 3000);
+    }, 2500);
   };
 
   const stopProgress = () => {
@@ -277,7 +125,6 @@ const DashboardATS = () => {
       setResults(r);
       toast({ title: "ATS Analysis Complete!", description: `Your ATS Score: ${r.ats_score}%` });
 
-      // Send notification
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification("SkillMirror AI", { body: `ATS Analysis Complete! Score: ${r.ats_score}%` });
       }
@@ -290,21 +137,21 @@ const DashboardATS = () => {
     }
   };
 
-  // Request notification permission on mount
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
 
+  const activeRole = targetRole === "Other" ? customRole : targetRole;
+
   return (
     <div className="space-y-6">
-      <h2 className="font-display text-xl font-bold flex items-center gap-2">
+      <motion.h2 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="font-display text-xl font-bold flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" /> ATS Score Analyzer
-      </h2>
+      </motion.h2>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 space-y-4">
-        {/* Role selection */}
         <div>
           <Label className="text-sm font-medium">Choose Target Role</Label>
           <Select value={targetRole} onValueChange={setTargetRole}>
@@ -319,7 +166,6 @@ const DashboardATS = () => {
           )}
         </div>
 
-        {/* Upload */}
         <div
           className="border-2 border-dashed border-border/50 rounded-lg p-6 text-center hover:border-primary/40 transition-colors cursor-pointer"
           onClick={() => document.getElementById("ats-upload")?.click()}
@@ -349,7 +195,7 @@ const DashboardATS = () => {
         </Button>
       </motion.div>
 
-      {/* Loading overlay with progress */}
+      {/* Loading overlay */}
       <AnimatePresence>
         {loading && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center">
@@ -359,7 +205,7 @@ const DashboardATS = () => {
               </motion.div>
               <Progress value={progress} className="h-2 mb-3" />
               <p className="text-sm font-medium text-primary">{progress}%</p>
-              <motion.p key={progressMsg} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-muted-foreground mt-1">{progressMsg}</motion.p>
+              <motion.p key={progressMsg} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-muted-foreground mt-1">{progressMsg}</motion.p>
             </div>
           </motion.div>
         )}
@@ -367,105 +213,111 @@ const DashboardATS = () => {
 
       {/* Results */}
       {results && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          {/* Score */}
-          <div className="glass-card p-6">
+        <div className="space-y-6">
+          {/* Score Cards */}
+          <motion.div {...fadeUp(0)} className="glass-card p-6">
             <div className="flex flex-wrap items-center justify-center gap-8">
               <ScoreCircle score={results.ats_score} label="ATS Score" color="hsl(var(--neon-cyan))" size={140} />
               {results.section_scores && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4 min-w-[200px]">
                   {Object.entries(results.section_scores).map(([key, val]) => (
-                    <div key={key} className="text-center">
-                      <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, " ")}</p>
-                      <Progress value={val as number} className="h-2 mt-1" />
-                      <p className="text-xs font-bold mt-1">{val as number}%</p>
+                    <div key={key} className="glass-card p-3 text-center">
+                      <p className="text-xs text-muted-foreground capitalize mb-1">{key.replace(/_/g, " ")}</p>
+                      <p className="text-lg font-bold" style={{ color: Number(val) >= 70 ? "hsl(var(--neon-green))" : "hsl(var(--accent))" }}>{val as number}%</p>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Keyword density */}
           {results.keyword_density && (
-            <div className="glass-card p-6">
-              <h3 className="font-display font-bold mb-3">Keyword Density</h3>
-              <div className="flex items-center gap-4 mb-2">
+            <motion.div {...fadeUp(1)} className="glass-card p-6">
+              <h3 className="font-display font-bold mb-3">Keyword Density Analysis</h3>
+              <div className="flex items-center gap-4 mb-3">
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground mb-1">Present: {results.keyword_density.present}% / Optimal: {results.keyword_density.optimal}%</p>
-                  <Progress value={results.keyword_density.present} className="h-3" />
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span>Present: {results.keyword_density.present}%</span>
+                    <span>Optimal: {results.keyword_density.optimal}%</span>
+                  </div>
+                  <div className="relative">
+                    <Progress value={results.keyword_density.present} className="h-3" />
+                    <div className="absolute top-0 h-3 border-r-2 border-primary" style={{ left: `${results.keyword_density.optimal}%` }} />
+                  </div>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">{results.keyword_density.suggestion}</p>
-            </div>
+            </motion.div>
           )}
 
           {/* Matching skills */}
           {results.matching_skills?.length > 0 && (
-            <div className="glass-card p-6">
+            <motion.div {...fadeUp(2)} className="glass-card p-6">
               <h3 className="font-display font-bold mb-3 flex items-center gap-2"><CheckCircle className="h-4 w-4 text-neon-green" /> Matching Keywords</h3>
               <div className="flex flex-wrap gap-2">{results.matching_skills.map((s: string) => <Badge key={s} className="bg-neon-green/20 text-neon-green border-neon-green/30">{s}</Badge>)}</div>
-            </div>
+            </motion.div>
           )}
 
           {/* Missing skills */}
           {results.missing_skills?.length > 0 && (
-            <div className="glass-card p-6">
+            <motion.div {...fadeUp(3)} className="glass-card p-6">
               <h3 className="font-display font-bold mb-3 flex items-center gap-2"><XCircle className="h-4 w-4 text-accent" /> Missing Keywords</h3>
               <div className="flex flex-wrap gap-2">{results.missing_skills.map((s: string) => <Badge key={s} className="bg-accent/20 text-accent border-accent/30">{s}</Badge>)}</div>
-            </div>
+            </motion.div>
           )}
 
           {/* Remove suggestions */}
           {results.remove_suggestions?.length > 0 && (
-            <div className="glass-card p-6">
+            <motion.div {...fadeUp(4)} className="glass-card p-6">
               <h3 className="font-display font-bold mb-3 flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive" /> Consider Removing</h3>
-              <ul className="space-y-2">{results.remove_suggestions.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-destructive">✗</span>{s}</li>)}</ul>
-            </div>
+              <ul className="space-y-2">{results.remove_suggestions.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-destructive shrink-0">✗</span><span>{s}</span></li>)}</ul>
+            </motion.div>
           )}
 
           {/* Weak sections */}
           {results.weak_sections?.length > 0 && (
-            <div className="glass-card p-6">
+            <motion.div {...fadeUp(5)} className="glass-card p-6">
               <h3 className="font-display font-bold mb-3 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-secondary" /> Weak Sections</h3>
-              <ul className="space-y-2">{results.weak_sections.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span>⚠</span>{s}</li>)}</ul>
-            </div>
+              <ul className="space-y-2">{results.weak_sections.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-secondary shrink-0">⚠</span><span>{s}</span></li>)}</ul>
+            </motion.div>
           )}
 
           {/* Improvement tips */}
           {results.improvement_tips?.length > 0 && (
-            <div className="glass-card p-6">
-              <h3 className="font-display font-bold mb-3 flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Improvement Tips</h3>
+            <motion.div {...fadeUp(6)} className="glass-card p-6">
+              <h3 className="font-display font-bold mb-3 flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Improvement Recommendations</h3>
               <ul className="space-y-2">{results.improvement_tips.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">{s}</li>)}</ul>
-            </div>
+            </motion.div>
+          )}
+
+          {/* Formatting issues */}
+          {results.formatting_issues?.length > 0 && (
+            <motion.div {...fadeUp(7)} className="glass-card p-6">
+              <h3 className="font-display font-bold mb-3">Formatting Issues</h3>
+              <ul className="space-y-2">{results.formatting_issues.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="shrink-0">•</span><span>{s}</span></li>)}</ul>
+            </motion.div>
           )}
 
           {/* Summary feedback */}
           {results.summary_feedback && (
-            <div className="glass-card p-6 neon-border">
-              <h3 className="font-display font-bold mb-2 gradient-text">Overall Feedback</h3>
-              <p className="text-sm text-muted-foreground">{results.summary_feedback}</p>
-            </div>
+            <motion.div {...fadeUp(8)} className="glass-card p-6 neon-border">
+              <h3 className="font-display font-bold mb-2 gradient-text">Overall Assessment</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{results.summary_feedback}</p>
+            </motion.div>
           )}
 
-          {/* Whitespace notice */}
-          <div className="glass-card p-4 bg-muted/20">
-            <p className="text-xs text-muted-foreground text-center italic">
-              Clean and normalize whitespace before rendering the PDF. Remove hidden characters and ensure proper UTF-8 formatting.
-            </p>
-          </div>
-
           {/* PDF Export */}
-          <div className="text-center">
+          <motion.div {...fadeUp(9)} className="text-center">
             <Button
-              onClick={() => generateATSReport(results, targetRole === "Other" ? customRole : targetRole, profile?.display_name || "User", profile?.email || "")}
+              onClick={() => generateATSReport(results, activeRole, profile?.display_name || "User", profile?.email || "")}
               size="lg"
               className="btn-glow bg-primary text-primary-foreground"
             >
               <Download className="h-4 w-4 mr-2" /> Download ATS Report PDF
             </Button>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
