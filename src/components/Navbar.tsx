@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Menu, X, Sparkles } from "lucide-react";
@@ -9,16 +9,51 @@ const navLinks = [
   { label: "Home", to: "/" },
   { label: "Features", to: "/#features" },
   { label: "How It Works", to: "/#timeline" },
+  { label: "About", to: "/#about" },
 ];
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.slice(1);
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }
+    }
+  }, [location]);
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    if (to === "/") {
+      e.preventDefault();
+      if (location.pathname !== "/" || location.hash) {
+        navigate("/");
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (to.startsWith("/#")) {
+      e.preventDefault();
+      const id = to.slice(2);
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      } else {
+        navigate(to);
+      }
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/");
+    window.location.href = "/";
   };
 
   return (
@@ -36,7 +71,12 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center gap-6">
           {navLinks.map((l) => (
-            <Link key={l.label} to={l.to} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+            <Link
+              key={l.label}
+              to={l.to}
+              onClick={(e) => handleNavClick(e, l.to)}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
               {l.label}
             </Link>
           ))}
@@ -74,7 +114,15 @@ const Navbar = () => {
           className="md:hidden glass-card border-t border-border/30 px-4 pb-4"
         >
           {navLinks.map((l) => (
-            <Link key={l.label} to={l.to} className="block py-2 text-sm text-muted-foreground hover:text-primary" onClick={() => setMobileOpen(false)}>
+            <Link
+              key={l.label}
+              to={l.to}
+              onClick={(e) => {
+                handleNavClick(e, l.to);
+                setMobileOpen(false);
+              }}
+              className="block py-2 text-sm text-muted-foreground hover:text-primary"
+            >
               {l.label}
             </Link>
           ))}

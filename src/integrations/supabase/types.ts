@@ -58,6 +58,28 @@ export type Database = {
           id: string
           updated_at: string
           user_id: string
+          last_seen_at: string | null
+          full_name: string | null
+          university: string | null
+          course: string | null
+          prn: string | null
+          graduation_year: number | null
+          country: string | null
+          linkedin: string | null
+          github: string | null
+          skillmirror_id: string | null
+          profile_completed: boolean
+          verification_status: string | null
+          candidate_score: number | null
+          risk_score: number | null
+          skill_authenticity_score: number | null
+          growth_potential_score: number | null
+          linkedin_url: string | null
+          research_interest: string | null
+          bio: string | null
+          resume_url: string | null
+          avatar_url: string | null
+          role: string | null
         }
         Insert: {
           created_at?: string
@@ -66,6 +88,28 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id: string
+          last_seen_at?: string | null
+          full_name?: string | null
+          university?: string | null
+          course?: string | null
+          prn?: string | null
+          graduation_year?: number | null
+          country?: string | null
+          linkedin?: string | null
+          github?: string | null
+          skillmirror_id?: string | null
+          profile_completed?: boolean
+          verification_status?: string | null
+          candidate_score?: number | null
+          risk_score?: number | null
+          skill_authenticity_score?: number | null
+          growth_potential_score?: number | null
+          linkedin_url?: string | null
+          research_interest?: string | null
+          bio?: string | null
+          resume_url?: string | null
+          avatar_url?: string | null
+          role?: string | null
         }
         Update: {
           created_at?: string
@@ -74,6 +118,541 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+          last_seen_at?: string | null
+          full_name?: string | null
+          university?: string | null
+          course?: string | null
+          prn?: string | null
+          graduation_year?: number | null
+          country?: string | null
+          linkedin?: string | null
+          github?: string | null
+          skillmirror_id?: string | null
+          profile_completed?: boolean
+          verification_status?: string | null
+          candidate_score?: number | null
+          risk_score?: number | null
+          skill_authenticity_score?: number | null
+          growth_potential_score?: number | null
+          linkedin_url?: string | null
+          research_interest?: string | null
+          bio?: string | null
+          resume_url?: string | null
+          avatar_url?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          is_active: boolean
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          is_active?: boolean
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          is_active?: boolean
+          created_at?: string
+          expires_at?: string | null
+        }
+        Relationships: []
+      }
+      user_activity: {
+        Row: {
+          id: string
+          user_id: string
+          activity_type: string
+          created_at: string
+          metadata: Json | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          activity_type: string
+          created_at?: string
+          metadata?: Json | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          activity_type?: string
+          created_at?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
+      skill_tests: {
+        Row: {
+          id: string
+          user_id: string
+          test_type: string
+          status: string
+          score: number | null
+          skills_verified: Json | null
+          started_at: string | null
+          completed_at: string | null
+          warnings: number
+          tab_switches: number | null
+          camera_warnings: number | null
+          time_spent_seconds: number | null
+          questions: Json | null
+          answers: Json | null
+          coding_answers: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          test_type?: string
+          status?: string
+          score?: number | null
+          skills_verified?: Json | null
+          started_at?: string | null
+          completed_at?: string | null
+          warnings?: number
+          tab_switches?: number | null
+          camera_warnings?: number | null
+          time_spent_seconds?: number | null
+          questions?: Json | null
+          answers?: Json | null
+          coding_answers?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          test_type?: string
+          status?: string
+          score?: number | null
+          skills_verified?: Json | null
+          started_at?: string | null
+          completed_at?: string | null
+          warnings?: number
+          tab_switches?: number | null
+          camera_warnings?: number | null
+          time_spent_seconds?: number | null
+          questions?: Json | null
+          answers?: Json | null
+          coding_answers?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      certificates: {
+        Row: {
+          id: string
+          user_id: string
+          skillmirror_id: string
+          certificate_number: string
+          full_name: string
+          university: string | null
+          course: string | null
+          test_score: number
+          verification_status: string | null
+          skills_verified: Json | null
+          issued_at: string
+          valid_until: string | null
+          qr_code: string | null
+          pdf_url: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          skillmirror_id: string
+          certificate_number?: string
+          full_name?: string
+          university?: string | null
+          course?: string | null
+          test_score?: number
+          verification_status?: string | null
+          skills_verified?: Json | null
+          issued_at?: string
+          valid_until?: string | null
+          qr_code?: string | null
+          pdf_url?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          skillmirror_id?: string
+          certificate_number?: string
+          full_name?: string
+          university?: string | null
+          course?: string | null
+          test_score?: number
+          verification_status?: string | null
+          skills_verified?: Json | null
+          issued_at?: string
+          valid_until?: string | null
+          qr_code?: string | null
+          pdf_url?: string | null
+        }
+        Relationships: []
+      }
+      roadmaps: {
+        Row: {
+          id: string
+          user_id: string
+          target_role: string
+          current_level: string
+          experience_level: string
+          time_commitment: string
+          roadmap_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          target_role: string
+          current_level?: string
+          experience_level?: string
+          time_commitment?: string
+          roadmap_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          target_role?: string
+          current_level?: string
+          experience_level?: string
+          time_commitment?: string
+          roadmap_data?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      resumes: {
+        Row: {
+          id: string
+          user_id: string
+          file_name: string
+          file_url: string | null
+          parsed_text: string | null
+          skills_detected: Json | null
+          experience: Json | null
+          projects: Json | null
+          education: Json | null
+          certifications: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          file_name: string
+          file_url?: string | null
+          parsed_text?: string | null
+          skills_detected?: Json | null
+          experience?: Json | null
+          projects?: Json | null
+          education?: Json | null
+          certifications?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          file_name?: string
+          file_url?: string | null
+          parsed_text?: string | null
+          skills_detected?: Json | null
+          experience?: Json | null
+          projects?: Json | null
+          education?: Json | null
+          certifications?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      recruiters: {
+        Row: {
+          id: string
+          user_id: string
+          full_name: string | null
+          email: string | null
+          company: string | null
+          position: string | null
+          phone: string | null
+          country: string | null
+          company_website: string | null
+          is_verified: boolean
+          approved_at: string | null
+          created_at: string
+          avatar_url: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          full_name?: string | null
+          email?: string | null
+          company?: string | null
+          position?: string | null
+          phone?: string | null
+          country?: string | null
+          company_website?: string | null
+          is_verified?: boolean
+          approved_at?: string | null
+          created_at?: string
+          avatar_url?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          full_name?: string | null
+          email?: string | null
+          company?: string | null
+          position?: string | null
+          phone?: string | null
+          country?: string | null
+          company_website?: string | null
+          is_verified?: boolean
+          approved_at?: string | null
+          created_at?: string
+          avatar_url?: string | null
+        }
+        Relationships: []
+      }
+      recruiter_requests: {
+        Row: {
+          id: string
+          full_name: string
+          email: string
+          company: string
+          position: string | null
+          phone: string | null
+          country: string | null
+          company_website: string | null
+          status: string
+          user_id: string | null
+          created_at: string
+          approved_at: string | null
+          rejected_at: string | null
+        }
+        Insert: {
+          id?: string
+          full_name: string
+          email: string
+          company: string
+          position?: string | null
+          phone?: string | null
+          country?: string | null
+          company_website?: string | null
+          status?: string
+          user_id?: string | null
+          created_at?: string
+          approved_at?: string | null
+          rejected_at?: string | null
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          email?: string
+          company?: string
+          position?: string | null
+          phone?: string | null
+          country?: string | null
+          company_website?: string | null
+          status?: string
+          user_id?: string | null
+          created_at?: string
+          approved_at?: string | null
+          rejected_at?: string | null
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          id: string
+          user_id: string | null
+          full_name: string | null
+          email: string | null
+          university: string | null
+          course: string | null
+          prn: string | null
+          phone: string | null
+          country: string | null
+          skillmirror_id: string | null
+          verification_status: string | null
+          candidate_score: number | null
+          risk_score: number | null
+          skill_authenticity_score: number | null
+          created_at: string
+          updated_at: string
+          linkedin_url: string | null
+          research_interest: string | null
+          bio: string | null
+          resume_url: string | null
+          avatar_url: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          full_name?: string | null
+          email?: string | null
+          university?: string | null
+          course?: string | null
+          prn?: string | null
+          phone?: string | null
+          country?: string | null
+          skillmirror_id?: string | null
+          verification_status?: string | null
+          candidate_score?: number | null
+          risk_score?: number | null
+          skill_authenticity_score?: number | null
+          created_at?: string
+          updated_at?: string
+          linkedin_url?: string | null
+          research_interest?: string | null
+          bio?: string | null
+          resume_url?: string | null
+          avatar_url?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          full_name?: string | null
+          email?: string | null
+          university?: string | null
+          course?: string | null
+          prn?: string | null
+          phone?: string | null
+          country?: string | null
+          skillmirror_id?: string | null
+          verification_status?: string | null
+          candidate_score?: number | null
+          risk_score?: number | null
+          skill_authenticity_score?: number | null
+          created_at?: string
+          updated_at?: string
+          linkedin_url?: string | null
+          research_interest?: string | null
+          bio?: string | null
+          resume_url?: string | null
+          avatar_url?: string | null
+        }
+        Relationships: []
+      }
+      candidate_views: {
+        Row: {
+          id: string
+          recruiter_id: string
+          candidate_id: string
+          viewed_at: string
+          contacted: boolean
+        }
+        Insert: {
+          id?: string
+          recruiter_id: string
+          candidate_id: string
+          viewed_at?: string
+          contacted?: boolean
+        }
+        Update: {
+          id?: string
+          recruiter_id?: string
+          candidate_id?: string
+          viewed_at?: string
+          contacted?: boolean
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          id: string
+          sender_id: string
+          receiver_id: string
+          content: string
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          receiver_id: string
+          content: string
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sender_id?: string
+          receiver_id?: string
+          content?: string
+          read_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          title: string
+          content: string | null
+          data: Json | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          title: string
+          content?: string | null
+          data?: Json | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          title?: string
+          content?: string | null
+          data?: Json | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          id: string
+          participant1_id: string
+          participant2_id: string
+          last_message: string | null
+          last_message_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          participant1_id: string
+          participant2_id: string
+          last_message?: string | null
+          last_message_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          participant1_id?: string
+          participant2_id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -82,7 +661,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_user_activity: {
+        Args: {
+          p_user_id: string
+          p_session_id: string
+        }
+        Returns: void
+      }
+      check_user_inactivity: {
+        Args: {
+          p_user_id: string
+          p_minutes: number
+        }
+        Returns: boolean
+      }
+      generate_skillmirror_id: {
+        Args: Record<string, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

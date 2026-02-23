@@ -6,6 +6,69 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+<<<<<<< C:/Users/SANKET/skillmirrorai/supabase/functions/analyze-resume/index.ts
+const DEFAULT_MODEL = "google/gemini-pro-1.5-flash";
+
+const MAX_RESUME_CHARS = 12000;
+const MAX_JOB_CHARS = 6000;
+const FETCH_TIMEOUT_MS = 45000;
+
+async function callLLM(apiKey: string, prompt: string, model: string, supabaseUrl: string): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+=======
+const MODELS = [
+  "openai/gpt-oss-120b:free",
+  "anthropic/claude-3-haiku:free",
+  "google/gemini-pro-1.5-flash",
+  "meta-llama/llama-3-70b-instruct",
+  "mistralai/mixtral-8x7b-instruct",
+];
+
+async function callLLM(apiKey: string, prompt: string, model: string, supabaseUrl: string): Promise<string> {
+>>>>>>> C:/Users/SANKET/.windsurf/worktrees/skillmirrorai/skillmirrorai-67f7d5fc/supabase/functions/analyze-resume/index.ts
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": supabaseUrl,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: "You are a career analysis AI. Return ONLY valid JSON. No markdown formatting." },
+        { role: "user", content: prompt },
+      ],
+<<<<<<< C:/Users/SANKET/skillmirrorai/supabase/functions/analyze-resume/index.ts
+      temperature: 0.2,
+      max_tokens: 900,
+    }),
+    signal: controller.signal,
+  });
+
+  clearTimeout(timeoutId);
+
+=======
+    }),
+  });
+
+>>>>>>> C:/Users/SANKET/.windsurf/worktrees/skillmirrorai/skillmirrorai-67f7d5fc/supabase/functions/analyze-resume/index.ts
+  if (!response.ok) {
+    const status = response.status;
+    if (status === 429) throw new Error("rate_limit");
+    if (status === 402) throw new Error("credits_exhausted");
+    if (status >= 500) throw new Error("server_error");
+    throw new Error(`model_error_${status}`);
+  }
+
+  const aiData = await response.json();
+  let content = aiData.choices?.[0]?.message?.content || "";
+  content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  return content;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -25,16 +88,25 @@ serve(async (req) => {
     const userId = data.claims.sub as string;
 
     const { resumeText, jobDescription, targetRole, location } = await req.json();
+    if (!resumeText || typeof resumeText !== "string") {
+      return new Response(JSON.stringify({ error: "Resume text is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
+    const safeResumeText = resumeText.slice(0, MAX_RESUME_CHARS);
+    const safeJobDescription = typeof jobDescription === "string" ? jobDescription.slice(0, MAX_JOB_CHARS) : jobDescription;
+
     const prompt = `You are an expert career analyst AI. Analyze the following resume against the job description provided.
 
 Resume Text:
-${resumeText}
+${safeResumeText}
 
-${jobDescription ? `Job Description:\n${jobDescription}` : "No specific job description provided. Do a general career analysis."}
+${safeJobDescription ? `Job Description:\n${safeJobDescription}` : "No specific job description provided. Do a general career analysis."}
 
 ${targetRole ? `Target Job Role: ${targetRole}` : ""}
 ${location ? `Preferred Location: ${location}` : ""}
@@ -66,44 +138,52 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
   "riskFactors": ["risk1", "risk2"]
 }`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b:free",
-        messages: [
-          { role: "system", content: "You are a career analysis AI. Return ONLY valid JSON. No markdown formatting." },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
+    let content = "";
+<<<<<<< C:/Users/SANKET/skillmirrorai/supabase/functions/analyze-resume/index.ts
+    try {
+      content = await callLLM(OPENROUTER_API_KEY, prompt, DEFAULT_MODEL, Deno.env.get("SUPABASE_URL") || "");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      if (msg === "rate_limit") {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (msg === "credits_exhausted") {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please try again later." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await response.text();
-      console.error("AI gateway error:", response.status, errText);
-      throw new Error("AI gateway error");
+      if (msg === "AbortError") {
+        return new Response(JSON.stringify({ error: "AI request timed out. Please try again." }), {
+          status: 504,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw e;
     }
 
-    const aiData = await response.json();
-    let content = aiData.choices?.[0]?.message?.content || "";
+=======
+    let lastError = "";
     
-    // Strip markdown code fences if present
-    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    
+    for (const model of MODELS) {
+      try {
+        content = await callLLM(OPENROUTER_API_KEY, prompt, model, Deno.env.get("SUPABASE_URL") || "");
+        break;
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : "Unknown error";
+        console.log(`Model ${model} failed: ${lastError}, trying next...`);
+        continue;
+      }
+    }
+
+    if (!content) {
+      throw new Error("All LLM models failed. Please try again later.");
+    }
+
+>>>>>>> C:/Users/SANKET/.windsurf/worktrees/skillmirrorai/skillmirrorai-67f7d5fc/supabase/functions/analyze-resume/index.ts
     let results;
     try {
       results = JSON.parse(content);
@@ -112,7 +192,6 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       throw new Error("AI returned invalid JSON");
     }
 
-    // Save to database
     const { error: insertError } = await supabase.from("analyses").insert({
       user_id: userId,
       resume_text: resumeText?.substring(0, 5000),

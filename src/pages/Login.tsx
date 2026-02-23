@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,28 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Redirect if already signed in
+  useEffect(() => {
+    if (!authLoading && user) {
+      const next = searchParams.get("next");
+      navigate(next && next.startsWith("/") ? next : "/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate, searchParams]);
+
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason === "inactive") {
+      toast({
+        title: "Session expired",
+        description: "You were logged out due to inactivity. Please sign in again.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +44,24 @@ const Login = () => {
     if (error) {
       toast({ title: "Sign in failed", description: error, variant: "destructive" });
     } else {
-      navigate("/dashboard");
+      const next = searchParams.get("next");
+      navigate(next && next.startsWith("/") ? next : "/dashboard");
     }
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Don't render login form if already signed in
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">

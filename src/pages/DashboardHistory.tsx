@@ -35,7 +35,35 @@ const DashboardHistory = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchHistory(); }, [user]);
+  useEffect(() => { 
+    fetchHistory(); 
+  }, [user]);
+
+  // Real-time subscription for analyses changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('analyses-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'analyses',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newAnalysis = payload.new as Analysis;
+          setAnalyses(prev => [newAnalysis, ...prev]);
+        } else if (payload.eventType === 'DELETE') {
+          setAnalyses(prev => prev.filter(a => a.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("analyses").delete().eq("id", id);
@@ -43,7 +71,6 @@ const DashboardHistory = () => {
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
     } else {
       toast({ title: "Deleted", description: "Analysis removed." });
-      setAnalyses(prev => prev.filter(a => a.id !== id));
     }
   };
 

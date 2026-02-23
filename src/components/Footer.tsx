@@ -1,4 +1,5 @@
-import { Sparkles, Linkedin, Instagram } from "lucide-react";
+import { Sparkles, Linkedin, Instagram, Building2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => (
   <footer className="border-t border-border/30 bg-card/20 py-12">
@@ -8,9 +9,15 @@ const Footer = () => (
           <Sparkles className="h-5 w-5 text-primary" />
           <span className="font-display font-bold gradient-text">SkillMirror AI</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          © 2026 SkillMirror AI. Your Intelligent Career Copilot.
-        </p>
+        <div className="flex items-center gap-6">
+          <Link to="/recruiter" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
+            <Building2 className="h-4 w-4" />
+            Recruiter Portal
+          </Link>
+          <p className="text-sm text-muted-foreground">
+            © 2026 SkillMirror AI. Your Intelligent Career Copilot.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <a href="https://www.linkedin.com/in/sanket-gaikwad-50134a314/" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
             <Linkedin className="h-5 w-5" />

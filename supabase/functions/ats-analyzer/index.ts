@@ -30,38 +30,105 @@ serve(async (req) => {
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
-    const prompt = `You are a SENIOR TECHNICAL RECRUITER with 15+ years of experience and deep expertise in ATS (Applicant Tracking System) analysis.
+    const prompt = `You are an advanced ATS engine and senior technical recruiter.
 
-Analyze the following resume SPECIFICALLY for the role of "${targetRole}".
+The user has provided:
+1. Resume
+2. Target Job Role Name only (no job description)
+
+Your task:
+
+STEP 1: Build Role Intelligence
+- Based on the job role name "${targetRole}", generate industry-standard:
+  - Core technical skills
+  - Preferred skills
+  - Tools commonly required
+  - Soft skills expected
+  - Experience expectations (Fresher/Mid/Senior)
+  - Common responsibilities
+
+STEP 2: Parse Resume
+- Extract skills
+- Extract projects
+- Extract experience
+- Extract measurable achievements
+- Identify weak bullet points
+- Identify missing metrics
+
+STEP 3: Skill Gap Analysis
+- Matched core skills
+- Missing core skills
+- Matched preferred skills
+- Missing preferred skills
+- Overqualified areas (if any)
+
+STEP 4: ATS Score Calculation
+Use weighted logic:
+- Core Skill Match (40%)
+- Preferred Skill Match (15%)
+- Experience Relevance (15%)
+- Project Strength (10%)
+- Quantified Impact (10%)
+- ATS Formatting (10%)
+
+IMPORTANT:
+- Do not hallucinate fake experience.
+- Do not add unrealistic skills.
+- Keep resume believable.
+- Think like a recruiter selecting top 10% candidates.
 
 Resume Text:
 ${resumeText}
 
-CRITICAL INSTRUCTIONS:
-1. Calculate a REAL, ACCURATE ATS score based on actual keyword matching against the "${targetRole}" role requirements
-2. Do NOT give inflated scores. Be honest and precise like a real ATS system would be
-3. Compare against actual industry-standard skill requirements for "${targetRole}"
-4. Analyze each section independently: summary, skills, experience, education, formatting
-5. Think like a recruiter: what would make you reject or shortlist this resume?
+Return ONLY valid JSON (no markdown, no code fences).
 
-SCORING RULES:
-- Count exact keyword matches vs required keywords for "${targetRole}"
-- Penalize for: missing critical skills, poor formatting, lack of quantification, irrelevant content
-- Reward for: strong action verbs, quantified achievements, role-aligned keywords, clean formatting
-- ATS score must reflect REAL compatibility, not encouragement
+CRITICAL: keep these existing keys (frontend compatibility):
+- ats_score (number)
+- matching_skills (string[])
+- missing_skills (string[])
+- remove_suggestions (string[])
+- improvement_tips (string[])
+- summary_feedback (string)
+- weak_sections (string[])
+- keyword_density ({present:number, optimal:number, suggestion:string})
+- formatting_issues (string[])
+- section_scores ({summary:number, skills:number, experience:number, education:number, overall_format:number})
 
-Return ONLY valid JSON (no markdown, no code fences):
+In addition, include these NEW keys:
 {
-  "ats_score": 72,
-  "matching_skills": ["React", "Node.js", "TypeScript"],
-  "missing_skills": ["Docker", "REST API", "CI/CD"],
-  "remove_suggestions": ["IoT experiments (irrelevant for ${targetRole})", "Unrelated hobby projects"],
-  "improvement_tips": ["Add measurable achievements with numbers", "Include more role-specific keywords in summary", "Use action verbs at the start of bullet points"],
-  "summary_feedback": "Specific, actionable feedback about this resume's ATS compatibility for ${targetRole}. Be direct and professional.",
-  "weak_sections": ["Summary is too generic for ${targetRole}", "Skills section lacks organization"],
-  "keyword_density": {"present": 65, "optimal": 85, "suggestion": "Add 8-10 more relevant keywords for ${targetRole}"},
-  "formatting_issues": ["Use consistent date format", "Add more white space between sections"],
-  "section_scores": {"summary": 60, "skills": 75, "experience": 70, "education": 80, "overall_format": 65}
+  "role_intelligence": {
+    "core_technical_skills": [""],
+    "preferred_skills": [""],
+    "tools": [""],
+    "soft_skills": [""],
+    "experience_expectation": "",
+    "common_responsibilities": [""]
+  },
+  "resume_parsing": {
+    "extracted_skills": [""],
+    "projects": [""],
+    "experience_summary": [""],
+    "measurable_achievements": [""],
+    "weak_bullets": [""],
+    "missing_metrics": [""]
+  },
+  "skill_gap": {
+    "matched_core_skills": [""],
+    "missing_core_skills": [""],
+    "matched_preferred_skills": [""],
+    "missing_preferred_skills": [""],
+    "overqualified_areas": [""]
+  },
+  "ats_breakdown": {
+    "core_skill_match": 0,
+    "preferred_skill_match": 0,
+    "experience_relevance": 0,
+    "project_strength": 0,
+    "quantified_impact": 0,
+    "ats_formatting": 0
+  },
+  "risk_factors": [""],
+  "optimized_resume_for_role": ""
 }`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {

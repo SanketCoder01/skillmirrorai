@@ -30,23 +30,56 @@ serve(async (req) => {
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
-    const prompt = `You are a SENIOR RESUME OPTIMIZATION SPECIALIST who thinks like a professional recruiter.
+    const prompt = `You are an expert ATS system, senior technical recruiter, and resume optimization specialist.
 
-CRITICAL RULES - READ CAREFULLY:
-1. Do NOT add fake experience or skills the candidate doesn't have
-2. Only optimize and rephrase EXISTING content
-3. If a section is ALREADY STRONG, say so. Do NOT suggest unnecessary changes
-4. Use SIMPLE, EASY-TO-READ language. No complex vocabulary
-5. Think like a recruiter: what changes would actually move this resume from "maybe" to "interview"?
-6. Be specific. "Add metrics" is generic. "Change 'managed team' to 'Led 8-person development team delivering 3 projects ahead of schedule'" is specific
-7. Only suggest improvements that would increase resume strength by 10%+ 
-8. Remove irrelevant content that doesn't match the job description
+You will receive:
+1) A job description
+2) A candidate resume
 
-SMART FILTERING RULES:
-- If summary already targets the role well → say "Your summary is well-aligned. No major changes needed."
-- If experience bullets already have metrics → don't suggest adding metrics to those bullets
-- If skills section already matches job keywords → acknowledge it, don't suggest redundant additions
-- Focus ONLY on what genuinely needs improvement
+Your job is to deeply analyze BOTH, do a realistic skill-gap analysis, and rewrite the resume to maximize shortlisting probability.
+
+NON-NEGOTIABLE RULES:
+1. Do NOT add fake experience, fake companies, fake dates, fake degrees, or fake achievements.
+2. Do NOT add skills that are not reasonably supported by the resume text.
+3. You MAY rephrase, reorder, and strengthen existing content.
+4. Keep the output ATS-friendly: clean sections, simple formatting, no tables, no icons, no markdown.
+5. Be analytical and structured. Avoid fluff.
+
+TASK 1: Analyze the Job Description deeply
+- Extract required technical skills
+- Extract preferred skills
+- Identify repeated keywords (top 10)
+- Identify role seniority
+- Identify industry domain
+- Identify soft skills expectations
+
+TASK 2: Analyze the Candidate Resume
+- Extract technical skills
+- Extract projects and achievements
+- Identify measurable impact (existing numbers)
+- Identify weak bullet points
+- Identify missing quantification
+- Identify irrelevant information
+
+TASK 3: Skill Gap Analysis
+- Matched skills
+- Partially matched skills (and what is missing)
+- Missing skills
+- Suggested additions (ONLY realistic additions that could be inferred or are small, truthful improvements like adding a missing keyword already implied)
+
+TASK 4: Rewrite the Resume
+- Optimize summary for the specific role
+- Improve bullet points using strong action verbs
+- Add quantifiable impact ONLY where reasonable (do not invent numbers; you may suggest "Add metric: <what to measure>" if unknown)
+- Naturally integrate important keywords from the JD
+- Keep resume believable and professional
+
+TASK 5: Provide scoring + reports
+- ATS Match Score (percentage)
+- Keyword Match Percentage
+- Section-wise improvement report
+- Risk factors (if any)
+- Final optimized resume output
 
 Resume Text:
 ${resumeText}
@@ -54,23 +87,46 @@ ${resumeText}
 Job Description:
 ${jobDescription}
 
-Return ONLY valid JSON (no markdown, no code fences):
+Return ONLY valid JSON (no markdown, no code fences). CRITICAL: Keep these existing keys for frontend compatibility:
+- optimized_summary (string)
+- optimized_skills (string[])
+- optimized_experience ({original:string, optimized:string}[])
+- added_keywords (string[])
+- removed_content (string[])
+- missing_from_resume (string[])
+- optimization_score ({before:number, after:number})
+- tone_feedback (string)
+- additional_tips (string[])
+- full_optimized_resume (string)
+
+In addition, include these NEW keys:
 {
-  "optimized_summary": "A rewritten professional summary in simple, clear language. Or 'Your current summary is strong and well-aligned with this role.' if already good",
-  "optimized_skills": ["Skill 1 (reordered/rephrased for relevance)", "Skill 2"],
-  "optimized_experience": [
-    {
-      "original": "Original bullet point from resume",
-      "optimized": "Rewritten with relevant keywords and metrics in simple language. If already strong, write 'No change needed - already well-written'"
-    }
-  ],
-  "added_keywords": ["keyword1", "keyword2"],
-  "removed_content": ["Irrelevant item 1", "Irrelevant item 2"],
-  "missing_from_resume": ["Critical gap 1 - specific and actionable"],
-  "optimization_score": {"before": 55, "after": 82},
-  "tone_feedback": "Professional, specific feedback about the overall tone and impact",
-  "additional_tips": ["Only actionable, specific tips that make real difference"],
-  "full_optimized_resume": "The complete rewritten resume text in clean format without any markdown. Use simple professional language throughout."
+  "job_analysis": {
+    "required_technical_skills": [""],
+    "preferred_skills": [""],
+    "repeated_keywords": [{"keyword":"", "count": 0}],
+    "role_seniority": "",
+    "industry_domain": "",
+    "soft_skills": [""]
+  },
+  "resume_analysis": {
+    "extracted_technical_skills": [""],
+    "projects_and_achievements": [""],
+    "measurable_impact_found": [""],
+    "weak_bullets": [""],
+    "missing_quantification": [""],
+    "irrelevant_information": [""]
+  },
+  "skill_gap_analysis": {
+    "matched_skills": [""],
+    "partially_matched_skills": [{"skill":"", "missing": ""}],
+    "missing_skills": [""],
+    "suggested_additions": [""]
+  },
+  "ats_match_score": 0,
+  "keyword_match_percentage": 0,
+  "section_improvement_report": [{"section":"Summary", "issues":[""], "fixes":[""]}],
+  "risk_factors": [""]
 }`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -83,7 +139,7 @@ Return ONLY valid JSON (no markdown, no code fences):
       body: JSON.stringify({
         model: "openai/gpt-oss-120b:free",
         messages: [
-          { role: "system", content: "You are a senior resume optimization specialist. Think like a recruiter. Return ONLY valid JSON. No markdown. Use simple, clear, easy-to-read language. Do NOT suggest changes when content is already strong. Be specific, not generic." },
+          { role: "system", content: "You are an expert ATS engine + senior technical recruiter + resume optimization specialist. You are strict, analytical, and structured. You do not hallucinate. Return ONLY valid JSON with all requested keys. No markdown." },
           { role: "user", content: prompt },
         ],
       }),

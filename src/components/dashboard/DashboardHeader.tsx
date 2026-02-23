@@ -1,9 +1,11 @@
-import { Bell, Moon, Sun, Sparkles } from "lucide-react";
+import { Moon, Sun, Sparkles, Award } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
+import NotificationsDropdown from "@/components/NotificationsDropdown";
 
 export function DashboardHeader() {
   const { profile } = useAuth();
@@ -33,18 +35,22 @@ export function DashboardHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-3">
+        {/* Unique SkillMirror ID */}
+        {profile?.skillmirror_id && (
+          <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 font-mono text-xs border-primary/30 bg-primary/5 px-2.5 py-1">
+            <Award className="h-3 w-3 text-primary" />
+            <span className="text-primary font-semibold">{profile.skillmirror_id}</span>
+          </Badge>
+        )}
         <Button variant="ghost" size="icon" onClick={() => setDark(!dark)} className="text-muted-foreground" title={dark ? "Switch to light mode" : "Switch to dark mode"}>
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
-        <Button variant="ghost" size="icon" className="text-muted-foreground relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
-        </Button>
+        <NotificationsDropdown />
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-            {(profile?.display_name?.[0] || "U").toUpperCase()}
+            {(profile?.full_name?.[0] || profile?.display_name?.[0] || "U").toUpperCase()}
           </div>
-          <span className="text-sm font-medium hidden sm:inline">{profile?.display_name || "User"}</span>
+          <span className="text-sm font-medium hidden sm:inline">{profile?.full_name?.split(" ")[0] || profile?.display_name || "User"}</span>
         </div>
       </div>
     </header>
