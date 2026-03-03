@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
   user: User | null;
@@ -34,13 +33,10 @@ interface AuthContextType {
     resume_url: string | null;
   } | null;
   refreshProfile: () => Promise<void>;
-  updateActivity: () => Promise<void>;
-  isSessionValid: boolean;
+  generateSkillMirrorId: (userId: string) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -69,164 +65,94 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     avatar_url: string | null;
     resume_url: string | null;
   } | null>(null);
-  const [isSessionValid, setIsSessionValid] = useState(true);
-  const [lastActivity, setLastActivity] = useState<number>(Date.now());
-  const navigate = useNavigate();
 
-  const updateActivity = useCallback(async () => {
-    setLastActivity(Date.now());
-    if (user) {
-      const { data } = await supabase.rpc("update_user_activity", { 
-        p_user_id: user.id, 
-        p_session_id: session?.access_token || "" 
-      });
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name, email, last_seen_at, profile_completed, skillmirror_id, full_name, university, course, country, verification_status, candidate_score, risk_score, skill_authenticity_score, linkedin_url, github, graduation_year, prn, bio, research_interest, avatar_url, resume_url")
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Profile fetch error:", error);
+      } else if (data) {
+        // If profile exists but no skillmirror_id, generate one
+        if (!data.skillmirror_id && data.profile_completed) {
+          console.log("Generating missing SkillMirror ID for user:", userId);
+          const generatedId = await generateSkillMirrorId(userId);
+          if (generatedId) {
+            data.skillmirror_id = generatedId;
+          }
+        }
+        setProfile(data as any);
+      }
+    } catch (error) {
+      console.error("Profile fetch error:", error);
     }
-  }, [user, session]);
-
-  const checkInactivity = useCallback(async () => {
-    if (!user) return;
-    
-    const { data } = await supabase.rpc("check_user_inactivity", { 
-      p_user_id: user.id, 
-      p_minutes: 5 
-    });
-    
-    if (data === true) {
-      setIsSessionValid(false);
-
-      await supabase.from("user_sessions")
-        .update({ is_active: false })
-        .eq("user_id", user.id)
-        .eq("session_id", session?.access_token || "");
-
-      await supabase.from("user_activity").insert({
-        user_id: user.id,
-        activity_type: "logout_inactive",
-      });
-
-      await supabase.auth.signOut();
-      navigate("/login?reason=inactive");
-    }
-  }, [user, session, navigate]);
+  };
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
     
-    // Fallback timeout to ensure loading completes even if Supabase hangs
-    const fallbackTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn("Auth loading timeout - forcing load complete");
-        setLoading(false);
-      }
-    }, 5000); // 5 second fallback
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        try {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("display_name, email, last_seen_at, profile_completed, skillmirror_id, full_name, university, course, country, verification_status, candidate_score, risk_score, skill_authenticity_score")
-            .eq("user_id", session.user.id)
-            .maybeSingle();
-          
-          if (mounted && profileData) {
-            setProfile(profileData as any);
-          }
-        } catch (error) {
-          console.error("Profile fetch error:", error);
-        }
-
-        // Create session record (non-blocking)
-        supabase.from("user_sessions").insert({
-          user_id: session.user.id,
-          session_id: session.access_token,
-          expires_at: new Date(Date.now() + INACTIVITY_TIMEOUT).toISOString(),
-        }).then(({ error }) => {
-          if (error) console.error("Session insert error:", error);
-        });
-
-        supabase.from("user_activity").insert({
-          user_id: session.user.id,
-          activity_type: "login",
-        }).then(({ error }) => {
-          if (error) console.error("Activity insert error:", error);
-        });
-      } else {
-        if (mounted) {
-          setProfile(null);
-          setIsSessionValid(true);
-        }
-      }
-    });
-
-    // Get initial session
+    // Get initial session first
     supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(fallbackTimeout);
       if (!mounted) return;
       
+      console.log("Initial session:", session?.user?.email || "No session");
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        supabase
-          .from("profiles")
-          .select("display_name, email, last_seen_at, profile_completed, skillmirror_id, full_name, university, course, country, verification_status, candidate_score, risk_score, skill_authenticity_score")
-          .eq("user_id", session.user.id)
-          .maybeSingle()
-          .then(({ data: profileData, error }) => {
-            if (error) {
-              console.error("Profile fetch error:", error);
-            } else if (mounted && profileData) {
-              setProfile(profileData as any);
-            }
-          });
+        fetchProfile(session.user.id);
       }
       setLoading(false);
-    }).catch((error) => {
-      clearTimeout(fallbackTimeout);
-      console.error("Get session error:", error);
-      if (mounted) {
-        setLoading(false);
-      }
     });
+
+    // Listen for auth changes - but don't auto-logout on temporary session changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
+      console.log("Auth state changed:", event, session?.user?.email || "No session");
+      
+      // Only sign out on explicit SIGNED_OUT event, not on session changes
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        }
+      } else if (session) {
+        // Other events with valid session - just update state, don't logout
+        setSession(session);
+        setUser(session.user);
+        if (session.user) {
+          fetchProfile(session.user.id);
+        }
+      }
+      // If event is something else and session is null, DON'T clear state
+      // This prevents logout on temporary network issues
+    });
+
+    // Periodic session refresh to keep session alive
+    const refreshInterval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && mounted) {
+        // Session is still valid, refresh it
+        await supabase.auth.refreshSession();
+      }
+    }, 4 * 60 * 1000); // Refresh every 4 minutes
 
     return () => {
       mounted = false;
-      clearTimeout(fallbackTimeout);
       subscription.unsubscribe();
+      clearInterval(refreshInterval);
     };
   }, []);
-
-  // Track activity and check for inactivity
-  useEffect(() => {
-    if (!user) return;
-
-    const activityEvents = ["mousedown", "keydown", "scroll", "touchstart"];
-    const handleActivity = () => updateActivity();
-
-    activityEvents.forEach(event => {
-      window.addEventListener(event, handleActivity);
-    });
-
-    const interval = setInterval(() => {
-      if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
-        checkInactivity();
-      }
-    }, 30000); // Check every 30 seconds
-
-    return () => {
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, handleActivity);
-      });
-      clearInterval(interval);
-    };
-  }, [user, lastActivity, updateActivity, checkInactivity]);
 
   const signUp = async (email: string, password: string, displayName: string) => {
     const { error, data } = await supabase.auth.signUp({
@@ -242,7 +168,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: error.message, needsVerification: false };
     }
     
-    // Check if email confirmation is required
     if (data.user && !data.session) {
       return { error: null, needsVerification: true };
     }
@@ -256,37 +181,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    if (user) {
-      // Update session to inactive
-      await supabase.from("user_sessions")
-        .update({ is_active: false })
-        .eq("user_id", user.id)
-        .eq("session_id", session?.access_token || "");
-      
-      // Log logout activity
-      await supabase.from("user_activity").insert({
-        user_id: user.id,
-        activity_type: "logout",
-      });
-    }
     await supabase.auth.signOut();
-    setIsSessionValid(true);
-    // Force page refresh to clear all state
+    setProfile(null);
     window.location.href = "/";
   };
 
   const refreshProfile = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("display_name, email, last_seen_at, profile_completed, skillmirror_id, full_name, university, course, country, verification_status, candidate_score, risk_score, skill_authenticity_score, linkedin_url, github, graduation_year, prn, bio, research_interest, avatar_url, resume_url")
-      .eq("user_id", user.id)
-      .single();
-    if (data) setProfile(data as any);
+    await fetchProfile(user.id);
+  };
+
+  const generateSkillMirrorId = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('generate_skillmirror_id');
+      if (error) throw error;
+      
+      // Update the profile with the generated ID
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ skillmirror_id: data })
+        .eq('user_id', userId);
+        
+      if (updateError) throw updateError;
+      
+      // Refresh profile to get updated data
+      await fetchProfile(userId);
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to generate SkillMirror ID:', error);
+      return null;
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, profile, refreshProfile, updateActivity, isSessionValid }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, profile, refreshProfile, generateSkillMirrorId }}>
       {children}
     </AuthContext.Provider>
   );

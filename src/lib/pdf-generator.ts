@@ -491,6 +491,219 @@ export function generateATSReport(
 }
 
 // ══════════════════════════════════════════════════
+// RESUME PDF DOWNLOAD (Clean Format)
+// ══════════════════════════════════════════════════
+export function downloadResumePDF(resumeText: string, fileName: string = "Optimized_Resume") {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  let y = 20;
+  const lineHeight = 6;
+  const maxWidth = pageWidth - (margin * 2);
+
+  // Clean the resume text - remove all markdown symbols
+  const cleanResume = resumeText
+    .replace(/[#*_~`>]/g, "")
+    .replace(/^- /gm, "")
+    .replace(/^\* /gm, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // Split into lines
+  const lines = cleanResume.split("\n");
+
+  lines.forEach((line) => {
+    line = line.trim();
+    if (!line) {
+      y += lineHeight / 2;
+      return;
+    }
+
+    // Check if we need a new page
+    if (y > pageHeight - 30) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // Detect headers (all caps or specific patterns)
+    const isHeader = /^[A-Z][A-Z\s]+$/.test(line) || 
+                     /^(SUMMARY|EXPERIENCE|PROJECTS|SKILLS|EDUCATION|AWARDS|CERTIFICATIONS|CONTACT)/i.test(line);
+
+    if (isHeader) {
+      // Add spacing before headers
+      y += 8;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 100, 150);
+      doc.text(line, margin, y);
+      // Add underline
+      doc.setDrawColor(0, 100, 150);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y + 2, margin + doc.getTextWidth(line), y + 2);
+      y += lineHeight;
+    } else if (line.startsWith("•") || line.startsWith("-")) {
+      // Bullet points
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(50, 50, 50);
+      const bulletText = line.replace(/^[•\-]\s*/, "");
+      const wrappedLines = doc.splitTextToSize(bulletText, maxWidth - 10);
+      wrappedLines.forEach((wrappedLine: string, idx: number) => {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        if (idx === 0) {
+          doc.text("•", margin, y);
+        }
+        doc.text(wrappedLine, margin + 8, y);
+        y += lineHeight;
+      });
+    } else if (/^[\d]+\./.test(line)) {
+      // Numbered items
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(50, 50, 50);
+      const wrappedLines = doc.splitTextToSize(line, maxWidth);
+      wrappedLines.forEach((wrappedLine: string) => {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(wrappedLine, margin, y);
+        y += lineHeight;
+      });
+    } else {
+      // Regular text
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(30, 30, 30);
+      const wrappedLines = doc.splitTextToSize(line, maxWidth);
+      wrappedLines.forEach((wrappedLine: string) => {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(wrappedLine, margin, y);
+        y += lineHeight;
+      });
+    }
+  });
+
+  doc.save(`${fileName}.pdf`);
+}
+
+// ══════════════════════════════════════════════════
+// RESUME DOCX DOWNLOAD (Clean Format)
+// ══════════════════════════════════════════════════
+export function downloadResumeDOCX(resumeText: string, fileName: string = "Optimized_Resume") {
+  // Clean the resume text - remove all markdown symbols
+  const cleanResume = resumeText
+    .replace(/[#*_~`>]/g, "")
+    .replace(/^- /gm, "")
+    .replace(/^\* /gm, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // Create a styled HTML document for Word
+  const htmlContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+          xmlns:w="urn:schemas-microsoft-com:office:word" 
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {
+          font-family: 'Calibri', 'Arial', sans-serif;
+          font-size: 11pt;
+          line-height: 1.4;
+          color: #333333;
+        }
+        .header {
+          font-size: 14pt;
+          font-weight: bold;
+          color: #006496;
+          margin-top: 16pt;
+          margin-bottom: 8pt;
+          border-bottom: 1px solid #006496;
+          padding-bottom: 4pt;
+        }
+        .name {
+          font-size: 18pt;
+          font-weight: bold;
+          color: #1a1a1a;
+          margin-bottom: 4pt;
+        }
+        .contact {
+          font-size: 10pt;
+          color: #666666;
+          margin-bottom: 12pt;
+        }
+        .section {
+          margin-bottom: 12pt;
+        }
+        .bullet {
+          margin-left: 20pt;
+          margin-bottom: 4pt;
+        }
+        .company {
+          font-weight: bold;
+          color: #1a1a1a;
+        }
+        .role {
+          font-weight: bold;
+          color: #006496;
+        }
+      </style>
+    </head>
+    <body>
+      ${formatResumeForDOCX(cleanResume)}
+    </body>
+    </html>
+  `;
+
+  // Create blob and download
+  const blob = new Blob([htmlContent], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${fileName}.doc`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function formatResumeForDOCX(text: string): string {
+  const lines = text.split('\n');
+  let html = '';
+
+  lines.forEach((line) => {
+    line = line.trim();
+    if (!line) {
+      html += '<br>';
+      return;
+    }
+
+    // Detect headers
+    const isHeader = /^[A-Z][A-Z\s]+$/.test(line) || 
+                     /^(SUMMARY|EXPERIENCE|PROJECTS|SKILLS|EDUCATION|AWARDS|CERTIFICATIONS|CONTACT)/i.test(line);
+
+    if (isHeader) {
+      html += `<div class="header">${line}</div>`;
+    } else if (line.startsWith('•') || line.startsWith('-')) {
+      const bulletText = line.replace(/^[•\-]\s*/, '');
+      html += `<div class="bullet">• ${bulletText}</div>`;
+    } else {
+      html += `<div>${line}</div>`;
+    }
+  });
+
+  return html;
+}
+
+// ══════════════════════════════════════════════════
 // RESUME OPTIMIZATION REPORT
 // ══════════════════════════════════════════════════
 export function generateRewriterReport(
@@ -509,69 +722,128 @@ export function generateRewriterReport(
     date
   );
 
-  // Score cards
-  if (results.optimization_score) {
+  // ATS Match Score
+  if (results.ats_match_score) {
     pdf.drawScoreCards([
-      { label: "BEFORE OPTIMIZATION", value: `${results.optimization_score.before}%`, color: COLORS.red },
-      { label: "AFTER OPTIMIZATION", value: `${results.optimization_score.after}%`, color: COLORS.green },
-      { label: "IMPROVEMENT", value: `+${(results.optimization_score.after || 0) - (results.optimization_score.before || 0)}%`, color: COLORS.primary },
+      { label: "ATS MATCH SCORE", value: `${results.ats_match_score}%`, color: COLORS.primary },
+      { label: "INTERVIEW PROBABILITY", value: `${results.interview_strength_analysis?.interview_probability || 0}%`, color: COLORS.green },
     ]);
   }
 
+  // Keyword Match Breakdown
+  if (results.keyword_match_breakdown) {
+    pdf.drawSection("Keyword Match Breakdown");
+    if (results.keyword_match_breakdown.core_skills_matched?.length) {
+      pdf.drawPara("Core Skills Matched:", 9, COLORS.dark, true, 24);
+      pdf.drawTags(results.keyword_match_breakdown.core_skills_matched, COLORS.green);
+    }
+    if (results.keyword_match_breakdown.keywords_integrated?.length) {
+      pdf.drawPara("Keywords Integrated:", 9, COLORS.dark, true, 24);
+      pdf.drawTags(results.keyword_match_breakdown.keywords_integrated, COLORS.primary);
+    }
+    pdf.y += 4;
+  }
+
+  // Gaps Identified
+  if (results.gaps_identified) {
+    pdf.drawSection("Gap Analysis");
+    if (results.gaps_identified.matched_skills?.length) {
+      pdf.drawPara("Matched Skills:", 9, COLORS.dark, true, 24);
+      pdf.drawTags(results.gaps_identified.matched_skills, COLORS.green);
+    }
+    if (results.gaps_identified.missing_but_learnable?.length) {
+      pdf.drawPara("Missing But Learnable:", 9, COLORS.dark, true, 24);
+      results.gaps_identified.missing_but_learnable.forEach((s: string) => pdf.drawBullet(s, COLORS.text));
+    }
+    if (results.gaps_identified.completely_missing_critical?.length) {
+      pdf.drawPara("Critical Missing:", 9, COLORS.red, true, 24);
+      results.gaps_identified.completely_missing_critical.forEach((s: string) => pdf.drawBullet(s, COLORS.red));
+    }
+    pdf.y += 4;
+  }
+
+  // Optimized Summary
   if (results.optimized_summary) {
     pdf.drawSection("Optimized Professional Summary");
     pdf.drawPara(results.optimized_summary);
     pdf.y += 4;
   }
 
-  if (results.optimized_skills?.length) {
-    pdf.drawSection("Optimized Skills");
-    pdf.drawTags(results.optimized_skills, COLORS.primary);
+  // Optimized Experience
+  if (results.optimized_experience?.length) {
+    pdf.drawSection("Optimized Experience");
+    results.optimized_experience.forEach((item: any) => {
+      pdf.checkPage(30);
+      pdf.drawPara(`${item.role} at ${item.company}`, 10, COLORS.dark, true, 24);
+      pdf.drawPara(item.duration || "", 8, COLORS.text, false, 24);
+      if (item.bullets) {
+        item.bullets.forEach((bullet: string) => pdf.drawBullet(bullet, COLORS.text));
+      }
+      pdf.y += 4;
+    });
   }
 
-  if (results.optimized_experience?.length) {
-    pdf.drawSection("Experience Rewrites (Before vs After)");
-    results.optimized_experience.forEach((item: any) => {
-      pdf.checkPage(20);
-      pdf.drawPara("Before: " + (item.original || ""), 8, COLORS.red, false, 28);
-      pdf.drawPara("After: " + (item.optimized || ""), 9, COLORS.green, true, 28);
+  // Optimized Projects
+  if (results.optimized_projects?.length) {
+    pdf.drawSection("Optimized Projects");
+    results.optimized_projects.forEach((item: any) => {
+      pdf.checkPage(25);
+      pdf.drawPara(item.name, 10, COLORS.dark, true, 24);
+      if (item.tech_stack?.length) {
+        pdf.drawPara(`Tech Stack: ${item.tech_stack.join(", ")}`, 8, COLORS.primary, false, 24);
+      }
+      if (item.bullets) {
+        item.bullets.forEach((bullet: string) => pdf.drawBullet(bullet, COLORS.text));
+      }
       pdf.y += 3;
+    });
+  }
+
+  // Optimized Skills
+  if (results.optimized_skills && Object.keys(results.optimized_skills).length > 0) {
+    pdf.drawSection("Optimized Skills");
+    Object.entries(results.optimized_skills).forEach(([category, skills]: [string, any]) => {
+      if (skills?.length) {
+        pdf.drawPara(`${category.replace(/_/g, " ")}:`, 9, COLORS.dark, true, 24);
+        pdf.drawTags(skills, COLORS.primary);
+      }
+    });
+  }
+
+  // Interview Strength Analysis
+  if (results.interview_strength_analysis) {
+    pdf.drawSection("Interview Strength Analysis");
+    if (results.interview_strength_analysis.strengths?.length) {
+      pdf.drawPara("Strengths:", 9, COLORS.green, true, 24);
+      results.interview_strength_analysis.strengths.forEach((s: string) => pdf.drawBullet(s, COLORS.green));
+    }
+    if (results.interview_strength_analysis.weaknesses?.length) {
+      pdf.drawPara("Areas to Improve:", 9, COLORS.red, true, 24);
+      results.interview_strength_analysis.weaknesses.forEach((s: string) => pdf.drawBullet(s, COLORS.red));
+    }
+    if (results.interview_strength_analysis.overall_impression) {
+      pdf.drawPara(`Overall Impression: ${results.interview_strength_analysis.overall_impression}`, 10, COLORS.dark, true, 24);
+    }
+    pdf.y += 4;
+  }
+
+  // Improvement Suggestions
+  if (results.improvement_suggestions?.length) {
+    pdf.drawSection("Suggestions to Improve Selection Chances");
+    results.improvement_suggestions.forEach((s: string, i: number) => {
+      pdf.drawPara(`${i + 1}. ${s}`, 9, COLORS.text, false, 24);
     });
     pdf.y += 4;
   }
 
-  if (results.added_keywords?.length) {
-    pdf.drawSection("Keywords Added");
-    pdf.drawTags(results.added_keywords, COLORS.green);
-  }
-
-  if (results.removed_content?.length) {
-    pdf.drawSection("Content Removed");
-    results.removed_content.forEach((s: string) => pdf.drawBullet(s, COLORS.red));
-    pdf.y += 4;
-  }
-
-  if (results.missing_from_resume?.length) {
-    pdf.drawSection("Critical Gaps");
-    results.missing_from_resume.forEach((s: string) => pdf.drawBullet(s, COLORS.red));
-    pdf.y += 4;
-  }
-
-  if (results.additional_tips?.length) {
-    pdf.drawSection("Additional Recommendations");
-    results.additional_tips.forEach((s: string) => pdf.drawBullet(s, COLORS.primary));
-    pdf.y += 4;
-  }
-
-  if (results.tone_feedback) {
-    pdf.drawSection("Tone Analysis");
-    pdf.drawPara(results.tone_feedback);
-    pdf.y += 4;
-  }
-
+  // Full Optimized Resume
   if (results.full_optimized_resume) {
     pdf.drawSection("Full Optimized Resume");
-    pdf.drawPara(results.full_optimized_resume);
+    const cleanResume = results.full_optimized_resume
+      .replace(/[#*_~`>]/g, "")
+      .replace(/^- /gm, "")
+      .replace(/^\* /gm, "");
+    pdf.drawPara(cleanResume, 9, COLORS.text, false, 20);
   }
 
   pdf.save("SkillMirror-Resume-Optimization-Report.pdf");

@@ -45,7 +45,7 @@ const StudentProfile = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
-  const { user, refreshProfile } = useAuth();
+  const { user, profile: authProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -61,6 +61,24 @@ const StudentProfile = () => {
     bio: "",
   });
 
+  // Use auth profile data immediately while loading full profile
+  useEffect(() => {
+    if (authProfile) {
+      setFormData({
+        full_name: authProfile.full_name || "",
+        university: authProfile.university || "",
+        course: authProfile.course || "",
+        prn: "",
+        graduation_year: "",
+        country: authProfile.country || "",
+        linkedin_url: "",
+        github: "",
+        research_interest: "",
+        bio: "",
+      });
+    }
+  }, [authProfile]);
+
   useEffect(() => {
     if (user) {
       fetchProfile();
@@ -75,23 +93,25 @@ const StudentProfile = () => {
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      setProfile(data);
-      setFormData({
-        full_name: data.full_name || "",
-        university: data.university || "",
-        course: data.course || "",
-        prn: data.prn || "",
-        graduation_year: data.graduation_year?.toString() || "",
-        country: data.country || "",
-        linkedin_url: data.linkedin_url || "",
-        github: data.github || "",
-        research_interest: data.research_interest || "",
-        bio: data.bio || "",
-      });
+      if (data) {
+        setProfile(data);
+        setFormData({
+          full_name: data.full_name || "",
+          university: data.university || "",
+          course: data.course || "",
+          prn: data.prn || "",
+          graduation_year: data.graduation_year?.toString() || "",
+          country: data.country || "",
+          linkedin_url: data.linkedin_url || "",
+          github: data.github || "",
+          research_interest: data.research_interest || "",
+          bio: data.bio || "",
+        });
+      }
     } catch (error) {
       console.error("Error fetching profile:", error);
       toast({ title: "Failed to load profile", variant: "destructive" });

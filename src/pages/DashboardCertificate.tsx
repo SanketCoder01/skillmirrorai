@@ -1,275 +1,284 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
-  Award, Download, QrCode, CheckCircle, Calendar, 
-  Building2, User, Shield, Loader2, Share2, Copy
+  Award, Upload, Trash2, Calendar, Building2, FileText, Loader2, Image, X,
+  Download, ZoomIn, FileImage, FileDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import QRCode from "qrcode";
 
-interface CertificateData {
+interface UserCertificate {
   id: string;
-  certificate_number: string;
   user_id: string;
-  skillmirror_id: string;
-  full_name: string;
-  university: string;
-  course: string;
-  test_score: number;
-  verification_status: string;
-  issued_at: string;
-  valid_until: string | null;
-  skills_verified: string[];
-  qr_code_url: string | null;
+  certificate_name: string;
+  issuing_company: string;
+  issue_date: string;
+  certificate_image_url: string | null;
+  created_at: string;
 }
 
 const DashboardCertificate = () => {
-  const [certificate, setCertificate] = useState<CertificateData | null>(null);
+  const [certificates, setCertificates] = useState<UserCertificate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
-  const certificateRef = useRef<HTMLDivElement>(null);
-  const { user, profile } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    certificate_name: "",
+    issuing_company: "",
+    issue_date: "",
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [viewCertificate, setViewCertificate] = useState<UserCertificate | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
-      fetchCertificate();
+      fetchCertificates();
     }
   }, [user]);
 
-  const fetchCertificate = async () => {
+  const fetchCertificates = async () => {
     if (!user) return;
     
     setLoading(true);
     
     try {
       const { data, error } = await supabase
-        .from("certificates")
+        .from("user_certificates")
         .select("*")
         .eq("user_id", user.id)
-        .order("issued_at", { ascending: false })
-        .limit(1)
-        .single();
+        .order("created_at", { ascending: false });
       
-      if (error && error.code !== "PGRST116") {
-        throw error;
-      }
-      
-      if (data) {
-        setCertificate(data);
-        
-        // Generate QR code
-        const verifyUrl = `${window.location.origin}/verify/${data.certificate_number}`;
-        const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-          width: 200,
-          margin: 2,
-          color: { dark: "#000", light: "#fff" },
-        });
-        setQrCodeDataUrl(qrDataUrl);
-      }
+      if (error) throw error;
+      setCertificates(data || []);
     } catch (error) {
-      console.error("Error fetching certificate:", error);
+      console.error("Error fetching certificates:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const generateCertificate = async () => {
-    if (!user || !profile) return;
-    
-    // Check if user is verified
-    if (profile.verification_status !== "verified" && profile.candidate_score < 70) {
-      toast({
-        title: "Not eligible",
-        description: "You need to pass the skill verification test with at least 70% score.",
-        variant: "destructive",
-      });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Maximum size is 5MB", variant: "destructive" });
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        toast({ title: "Invalid file", description: "Please upload an image file", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !formData.certificate_name || !formData.issuing_company || !formData.issue_date) {
+      toast({ title: "Missing fields", description: "Please fill all required fields", variant: "destructive" });
       return;
     }
-    
-    setGenerating(true);
-    
+
+    setUploading(true);
+
     try {
-      // Get test score
-      const { data: testResult } = await supabase
-        .from("skill_tests")
-        .select("score, skills_verified")
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .single();
-      
-      const score = testResult?.score || profile.candidate_score || 0;
-      
-      // Generate certificate number
-      const certNumber = `SM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      
-      const { data, error } = await supabase
-        .from("certificates")
+      let imageUrl: string | null = null;
+
+      // Upload image if selected
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("user-certificates")
+          .upload(fileName, selectedFile);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from("user-certificates")
+          .getPublicUrl(fileName);
+        
+        imageUrl = publicUrl;
+      }
+
+      // Insert certificate record
+      const { error: insertError } = await supabase
+        .from("user_certificates")
         .insert({
           user_id: user.id,
-          skillmirror_id: profile.skillmirror_id,
-          full_name: profile.full_name,
-          university: profile.university,
-          course: profile.course,
-          test_score: score,
-          verification_status: profile.verification_status,
-          certificate_number: certNumber,
-          skills_verified: testResult?.skills_verified || [],
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      setCertificate(data);
-      
-      // Generate QR code
-      const verifyUrl = `${window.location.origin}/verify/${certNumber}`;
-      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-        width: 200,
-        margin: 2,
-        color: { dark: "#000", light: "#fff" },
-      });
-      setQrCodeDataUrl(qrDataUrl);
-      
-      toast({
-        title: "Certificate Generated!",
-        description: "Your skill verification certificate is ready.",
-      });
-    } catch (error: any) {
-      console.error("Error generating certificate:", error);
-      toast({
-        title: "Generation Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const downloadCertificate = async () => {
-    if (!certificateRef.current || !certificate) return;
-    
-    // Create a simple HTML-based certificate for download
-    const verifyUrl = `${window.location.origin}/verify/${certificate.certificate_number}`;
-    
-    const certHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>SkillMirror Certificate - ${certificate.full_name}</title>
-        <style>
-          body { font-family: 'Georgia', serif; margin: 0; padding: 40px; background: #f5f5f5; }
-          .certificate { 
-            max-width: 800px; margin: 0 auto; background: white; 
-            padding: 60px; border: 3px solid #1a365d; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-          }
-          .header { text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 30px; margin-bottom: 30px; }
-          .logo { font-size: 32px; font-weight: bold; color: #1a365d; }
-          .title { font-size: 28px; color: #2d3748; margin-top: 20px; text-transform: uppercase; letter-spacing: 4px; }
-          .content { text-align: center; padding: 30px 0; }
-          .name { font-size: 36px; color: #1a365d; font-weight: bold; margin: 20px 0; }
-          .text { font-size: 16px; color: #4a5568; line-height: 1.8; }
-          .score { font-size: 48px; color: #48bb78; font-weight: bold; margin: 20px 0; }
-          .details { display: flex; justify-content: space-around; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-          .detail-item { text-align: center; }
-          .detail-label { font-size: 12px; color: #718096; text-transform: uppercase; }
-          .detail-value { font-size: 14px; color: #2d3748; font-weight: bold; }
-          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #1a365d; }
-          .cert-number { font-family: monospace; font-size: 14px; color: #718096; }
-          .qr { margin-top: 20px; }
-          .verify-link { font-size: 12px; color: #4299e1; }
-        </style>
-      </head>
-      <body>
-        <div class="certificate">
-          <div class="header">
-            <div class="logo">🎓 SkillMirror</div>
-            <div class="title">Certificate of Skill Verification</div>
-          </div>
-          <div class="content">
-            <div class="text">This is to certify that</div>
-            <div class="name">${certificate.full_name}</div>
-            <div class="text">
-              has successfully completed the SkillMirror Skill Verification Assessment<br>
-              with a score of
-            </div>
-            <div class="score">${certificate.test_score}%</div>
-            <div class="text">
-              demonstrating proficiency in technical skills and professional competencies.
-            </div>
-          </div>
-          <div class="details">
-            <div class="detail-item">
-              <div class="detail-label">SkillMirror ID</div>
-              <div class="detail-value">${certificate.skillmirror_id}</div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">University</div>
-              <div class="detail-value">${certificate.university}</div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">Course</div>
-              <div class="detail-value">${certificate.course}</div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">Issue Date</div>
-              <div class="detail-value">${new Date(certificate.issued_at).toLocaleDateString()}</div>
-            </div>
-          </div>
-          <div class="footer">
-            <div class="cert-number">Certificate No: ${certificate.certificate_number}</div>
-            <div class="verify-link">Verify at: ${verifyUrl}</div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    // Open in new window for printing/saving
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(certHtml);
-      printWindow.document.close();
-      printWindow.print();
-    }
-  };
-
-  const copyCertificateLink = () => {
-    if (!certificate) return;
-    const url = `${window.location.origin}/verify/${certificate.certificate_number}`;
-    navigator.clipboard.writeText(url);
-    toast({
-      title: "Link copied!",
-      description: "Certificate verification link copied to clipboard.",
-    });
-  };
-
-  const shareCertificate = async () => {
-    if (!certificate) return;
-    const url = `${window.location.origin}/verify/${certificate.certificate_number}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "My SkillMirror Certificate",
-          text: `I scored ${certificate.test_score}% on my SkillMirror Skill Verification! Verify my certificate:`,
-          url,
+          certificate_name: formData.certificate_name,
+          issuing_company: formData.issuing_company,
+          issue_date: formData.issue_date,
+          certificate_image_url: imageUrl,
         });
-      } catch (error) {
-        console.log("Share cancelled");
+
+      if (insertError) throw insertError;
+
+      toast({ title: "Certificate uploaded!", description: "Your certificate has been added successfully." });
+      
+      // Reset form
+      setFormData({ certificate_name: "", issuing_company: "", issue_date: "" });
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setShowForm(false);
+      
+      fetchCertificates();
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (cert: UserCertificate) => {
+    if (!confirm("Are you sure you want to delete this certificate?")) return;
+
+    try {
+      // Delete image from storage if exists
+      if (cert.certificate_image_url) {
+        const path = cert.certificate_image_url.split("/user-certificates/")[1];
+        if (path) {
+          await supabase.storage.from("user-certificates").remove([path]);
+        }
       }
-    } else {
-      copyCertificateLink();
+
+      // Delete record
+      const { error } = await supabase
+        .from("user_certificates")
+        .delete()
+        .eq("id", cert.id);
+
+      if (error) throw error;
+
+      toast({ title: "Certificate deleted" });
+      fetchCertificates();
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // Download as JPG (original image)
+  const downloadAsJpg = async (cert: UserCertificate) => {
+    if (!cert.certificate_image_url) {
+      toast({ title: "No image available", description: "This certificate has no image to download", variant: "destructive" });
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      const response = await fetch(cert.certificate_image_url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cert.certificate_name.replace(/\s+/g, '_')}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Downloaded as JPG" });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({ title: "Download failed", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Download as PDF (convert image to PDF)
+  const downloadAsPdf = async (cert: UserCertificate) => {
+    if (!cert.certificate_image_url) {
+      toast({ title: "No image available", description: "This certificate has no image to download", variant: "destructive" });
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      // Create a canvas to convert image to PDF
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = cert.certificate_image_url;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not create canvas context');
+      ctx.drawImage(img, 0, 0);
+
+      // Convert to PDF using data URL
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Create a simple HTML page with the image and print as PDF
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({ title: "Popup blocked", description: "Please allow popups to download PDF", variant: "destructive" });
+        return;
+      }
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${cert.certificate_name}</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+              img { max-width: 100%; height: auto; }
+              @media print {
+                body { display: block; }
+                img { width: 100%; height: auto; page-break-after: avoid; }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${imgData}" alt="${cert.certificate_name}" />
+            <script>
+              window.onload = function() {
+                window.print();
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      
+      toast({ title: "PDF ready to print/save", description: "Use Print dialog to save as PDF" });
+    } catch (error) {
+      console.error("PDF conversion error:", error);
+      toast({ title: "PDF generation failed", variant: "destructive" });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -285,157 +294,117 @@ const DashboardCertificate = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold">Skill Verification Certificate</h1>
-          <p className="text-muted-foreground">Your verified skill credentials</p>
+          <h1 className="text-2xl font-display font-bold">My Certificates</h1>
+          <p className="text-muted-foreground">Store all your certificates here and download whenever you want</p>
         </div>
-        {certificate && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={copyCertificateLink}>
-              <Copy className="h-4 w-4 mr-1" />
-              Copy Link
-            </Button>
-            <Button variant="outline" size="sm" onClick={shareCertificate}>
-              <Share2 className="h-4 w-4 mr-1" />
-              Share
-            </Button>
-            <Button size="sm" onClick={downloadCertificate}>
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-          </div>
-        )}
+        <Button onClick={() => setShowForm(!showForm)}>
+          {showForm ? <X className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+          {showForm ? "Cancel" : "Add Certificate"}
+        </Button>
       </div>
 
-      {certificate ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Certificate Preview */}
-          <div className="lg:col-span-2">
-            <Card className="glass-card overflow-hidden">
-              <div 
-                ref={certificateRef}
-                className="p-8 bg-white text-gray-900"
-                style={{ 
-                  background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-                }}
-              >
-                <div className="text-center border-b-2 border-primary/30 pb-6 mb-6">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <Award className="h-8 w-8 text-primary" />
-                    <span className="text-2xl font-display font-bold text-primary">SkillMirror</span>
-                  </div>
-                  <h2 className="text-xl font-bold uppercase tracking-widest text-gray-700">
-                    Certificate of Skill Verification
-                  </h2>
-                </div>
+      {/* Description Card */}
+      <Card className="glass-card border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Award className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-sm">Certificate Storage</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Upload and securely store all your certificates in one place. Click on any certificate to view it in full size. 
+                Download as JPG or PDF format whenever you need to share them.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-                <div className="text-center py-6">
-                  <p className="text-gray-600">This is to certify that</p>
-                  <h3 className="text-3xl font-bold text-primary my-4">{certificate.full_name}</h3>
-                  <p className="text-gray-600">
-                    has successfully completed the SkillMirror Skill Verification Assessment
-                  </p>
-                  <div className="my-6">
-                    <span className="text-5xl font-bold text-green-600">{certificate.test_score}%</span>
-                  </div>
-                  <p className="text-gray-600">
-                    demonstrating proficiency in technical skills and professional competencies
-                  </p>
+      {/* Upload Form */}
+      {showForm && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Add New Certificate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpload} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="cert_name">Certificate Name *</Label>
+                  <Input
+                    id="cert_name"
+                    value={formData.certificate_name}
+                    onChange={e => setFormData({ ...formData, certificate_name: e.target.value })}
+                    placeholder="e.g., AWS Solutions Architect"
+                    className="mt-1"
+                    required
+                  />
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-gray-200 pt-6 mt-6">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">SkillMirror ID</p>
-                    <p className="font-mono font-bold text-sm">{certificate.skillmirror_id}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">University</p>
-                    <p className="font-bold text-sm">{certificate.university}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Course</p>
-                    <p className="font-bold text-sm">{certificate.course}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Issue Date</p>
-                    <p className="font-bold text-sm">{new Date(certificate.issued_at).toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500">Certificate Number</p>
-                    <p className="font-mono text-sm">{certificate.certificate_number}</p>
-                  </div>
-                  {qrCodeDataUrl && (
-                    <div className="text-center">
-                      <img src={qrCodeDataUrl} alt="QR Code" className="w-20 h-20 mx-auto" />
-                      <p className="text-xs text-gray-500 mt-1">Scan to verify</p>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-green-600" />
-                    <span className="text-xs text-green-600 font-bold">VERIFIED</span>
-                  </div>
+                <div>
+                  <Label htmlFor="company">Issuing Company *</Label>
+                  <Input
+                    id="company"
+                    value={formData.issuing_company}
+                    onChange={e => setFormData({ ...formData, issuing_company: e.target.value })}
+                    placeholder="e.g., Amazon Web Services"
+                    className="mt-1"
+                    required
+                  />
                 </div>
               </div>
-            </Card>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="issue_date">Issue Date *</Label>
+                  <Input
+                    id="issue_date"
+                    type="date"
+                    value={formData.issue_date}
+                    onChange={e => setFormData({ ...formData, issue_date: e.target.value })}
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="image">Certificate Image</Label>
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Max 5MB, images only</p>
+                </div>
+              </div>
+              
+              {previewUrl && (
+                <div className="mt-4">
+                  <Label>Preview</Label>
+                  <div className="mt-2 border rounded-lg p-2 inline-block">
+                    <img src={previewUrl} alt="Preview" className="max-h-48 rounded" />
+                  </div>
+                </div>
+              )}
 
-          {/* Certificate Details */}
-          <div className="space-y-4">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Verification Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Badge className="bg-green-500">
-                  <Shield className="h-3 w-3 mr-1" />
-                  Verified & Authentic
-                </Badge>
-                <p className="text-sm text-muted-foreground mt-3">
-                  This certificate is cryptographically verified and can be authenticated by anyone with the certificate link.
-                </p>
-              </CardContent>
-            </Card>
+              <Button type="submit" disabled={uploading} className="w-full md:w-auto">
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Certificate
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg">Skills Verified</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {(certificate.skills_verified || ["Problem Solving", "Technical Analysis", "Communication"]).map((skill, idx) => (
-                    <Badge key={idx} variant="secondary">{skill}</Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg">Certificate Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Issued: {new Date(certificate.issued_at).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span>Candidate Score: {certificate.test_score}%</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{certificate.university}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : (
+      {/* Certificates List */}
+      {certificates.length === 0 ? (
         <Card className="glass-card">
           <CardContent className="p-8 text-center">
             <motion.div
@@ -445,35 +414,144 @@ const DashboardCertificate = () => {
             >
               <Award className="h-12 w-12 text-primary" />
             </motion.div>
-            <h3 className="text-xl font-bold mb-2">No Certificate Yet</h3>
+            <h3 className="text-xl font-bold mb-2">No Certificates Yet</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {profile?.verification_status === "verified" || (profile?.candidate_score || 0) >= 70
-                ? "You're eligible! Generate your skill verification certificate now."
-                : "Complete the Skill Verification Test with at least 70% score to earn your certificate."}
+              Upload your certificates to showcase your achievements to recruiters.
             </p>
-            
-            {(profile?.verification_status === "verified" || (profile?.candidate_score || 0) >= 70) ? (
-              <Button onClick={generateCertificate} disabled={generating} className="btn-glow">
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Award className="h-4 w-4 mr-2" />
-                    Generate Certificate
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button onClick={() => window.location.href = "/dashboard/skill-test"}>
-                Take Skill Test
-              </Button>
-            )}
+            <Button onClick={() => setShowForm(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Add Your First Certificate
+            </Button>
           </CardContent>
         </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {certificates.map((cert) => (
+            <Card 
+              key={cert.id} 
+              className="glass-card overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+              onClick={() => setViewCertificate(cert)}
+            >
+              {cert.certificate_image_url ? (
+                <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden relative group">
+                  <img 
+                    src={cert.certificate_image_url} 
+                    alt={cert.certificate_name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <ZoomIn className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+              ) : (
+                <div className="aspect-video bg-muted flex items-center justify-center">
+                  <FileText className="h-12 w-12 text-muted-foreground" />
+                </div>
+              )}
+              <CardContent className="p-4">
+                <h3 className="font-semibold truncate">{cert.certificate_name}</h3>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <Building2 className="h-3 w-3" />
+                  <span className="truncate">{cert.issuing_company}</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>{new Date(cert.issue_date).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between items-center mt-3">
+                  <span className="text-xs text-muted-foreground">Click to view</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(cert);
+                    }}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
+
+      {/* Certificate View Dialog */}
+      <Dialog open={!!viewCertificate} onOpenChange={() => setViewCertificate(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-primary" />
+              {viewCertificate?.certificate_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {viewCertificate && (
+            <div className="space-y-4">
+              {/* Certificate Image */}
+              {viewCertificate.certificate_image_url ? (
+                <div className="border rounded-lg overflow-hidden bg-muted">
+                  <img 
+                    src={viewCertificate.certificate_image_url} 
+                    alt={viewCertificate.certificate_name}
+                    className="w-full h-auto max-h-[60vh] object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="border rounded-lg p-12 flex flex-col items-center justify-center bg-muted">
+                  <FileText className="h-16 w-16 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">No image available</p>
+                </div>
+              )}
+              
+              {/* Certificate Details */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Issuing Company</p>
+                  <p className="font-medium">{viewCertificate.issuing_company}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Issue Date</p>
+                  <p className="font-medium">{new Date(viewCertificate.issue_date).toLocaleDateString()}</p>
+                </div>
+              </div>
+              
+              {/* Download Options */}
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => downloadAsJpg(viewCertificate)}
+                  disabled={downloading || !viewCertificate.certificate_image_url}
+                >
+                  <FileImage className="h-4 w-4 mr-2" />
+                  Download as JPG
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => downloadAsPdf(viewCertificate)}
+                  disabled={downloading || !viewCertificate.certificate_image_url}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Download as PDF
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    handleDelete(viewCertificate);
+                    setViewCertificate(null);
+                  }}
+                  className="ml-auto"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

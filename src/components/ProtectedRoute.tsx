@@ -18,8 +18,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
   }
 
-  // Redirect to profile completion if not completed (unless already on that page)
-  if (profile && !profile.profile_completed && location.pathname !== "/complete-profile") {
+  // Only redirect to profile completion if we have profile data and it's explicitly not completed
+  // Don't redirect if profile is null (still loading) or if already on complete-profile page
+  if (profile && profile.profile_completed === false && location.pathname !== "/complete-profile") {
     return <Navigate to="/complete-profile" replace />;
   }
 

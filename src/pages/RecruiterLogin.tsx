@@ -37,7 +37,16 @@ const RecruiterLogin = () => {
       const { error } = await signIn(email, password);
       
       if (error) {
-        toast({ title: "Login failed", description: error, variant: "destructive" });
+        // Check for specific error messages
+        if (error.includes("Email not confirmed") || error.includes("email_not_confirmed")) {
+          toast({ 
+            title: "Email Not Verified", 
+            description: "Please check your email and click the confirmation link before signing in. Check your spam folder if you don't see it.", 
+            variant: "destructive" 
+          });
+        } else {
+          toast({ title: "Login failed", description: error, variant: "destructive" });
+        }
         setLoading(false);
         return;
       }
@@ -83,7 +92,6 @@ const RecruiterLogin = () => {
                 country: approvedReq.country,
                 company_website: approvedReq.company_website,
                 is_verified: true,
-                approved_at: new Date().toISOString(),
               },
               { onConflict: "email" }
             );

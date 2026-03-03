@@ -575,23 +575,86 @@ export type Database = {
           sender_id: string
           receiver_id: string
           content: string
+          attachment_url: string | null
+          attachment_name: string | null
+          attachment_type: string | null
+          conversation_id: string | null
+          status: string
+          delivered_at: string | null
+          seen_at: string | null
+          deleted_by_sender: boolean
+          deleted_by_receiver: boolean
           read_at: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           sender_id: string
           receiver_id: string
           content: string
+          attachment_url?: string | null
+          attachment_name?: string | null
+          attachment_type?: string | null
+          conversation_id?: string | null
+          status?: string
+          delivered_at?: string | null
+          seen_at?: string | null
+          deleted_by_sender?: boolean
+          deleted_by_receiver?: boolean
           read_at?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           sender_id?: string
           receiver_id?: string
           content?: string
+          attachment_url?: string | null
+          attachment_name?: string | null
+          attachment_type?: string | null
+          conversation_id?: string | null
+          status?: string
+          delivered_at?: string | null
+          seen_at?: string | null
+          deleted_by_sender?: boolean
+          deleted_by_receiver?: boolean
           read_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_reports: {
+        Row: {
+          id: string
+          user_id: string
+          file_name: string
+          file_url: string
+          file_size: number
+          report_type: string | null
+          target_role: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          file_name: string
+          file_url: string
+          file_size?: number
+          report_type?: string | null
+          target_role?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          file_name?: string
+          file_url?: string
+          file_size?: number
+          report_type?: string | null
+          target_role?: string | null
           created_at?: string
         }
         Relationships: []
@@ -652,6 +715,84 @@ export type Database = {
           participant2_id?: string
           last_message?: string | null
           last_message_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      user_presence: {
+        Row: {
+          id: string
+          user_id: string
+          is_online: boolean
+          last_seen_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          is_online?: boolean
+          last_seen_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          is_online?: boolean
+          last_seen_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      typing_indicators: {
+        Row: {
+          id: string
+          conversation_id: string | null
+          user_id: string
+          is_typing: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id?: string | null
+          user_id: string
+          is_typing?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string | null
+          user_id?: string
+          is_typing?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_certificates: {
+        Row: {
+          id: string
+          user_id: string
+          certificate_name: string
+          issuing_company: string
+          issue_date: string
+          certificate_image_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          certificate_name: string
+          issuing_company: string
+          issue_date: string
+          certificate_image_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          certificate_name?: string
+          issuing_company?: string
+          issue_date?: string
+          certificate_image_url?: string | null
           created_at?: string
         }
         Relationships: []

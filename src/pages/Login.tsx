@@ -27,11 +27,20 @@ const Login = () => {
 
   useEffect(() => {
     const reason = searchParams.get("reason");
+    const verification = searchParams.get("verification");
+    
     if (reason === "inactive") {
       toast({
         title: "Session expired",
         description: "You were logged out due to inactivity. Please sign in again.",
         variant: "destructive",
+      });
+    }
+    
+    if (verification === "pending") {
+      toast({
+        title: "Email Verification Required",
+        description: "Please check your email inbox (and spam folder) for the confirmation link. You must verify your email before signing in.",
       });
     }
   }, [searchParams]);
@@ -42,7 +51,16 @@ const Login = () => {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
-      toast({ title: "Sign in failed", description: error, variant: "destructive" });
+      // Check for specific error messages
+      if (error.includes("Email not confirmed") || error.includes("email_not_confirmed")) {
+        toast({ 
+          title: "Email Not Verified", 
+          description: "Please check your email and click the confirmation link before signing in. Check your spam folder if you don't see it.", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: "Sign in failed", description: error, variant: "destructive" });
+      }
     } else {
       const next = searchParams.get("next");
       navigate(next && next.startsWith("/") ? next : "/dashboard");

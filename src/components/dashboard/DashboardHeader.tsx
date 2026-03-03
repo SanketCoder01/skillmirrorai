@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 
 export function DashboardHeader() {
@@ -46,12 +47,17 @@ export function DashboardHeader() {
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
         <NotificationsDropdown />
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-            {(profile?.full_name?.[0] || profile?.display_name?.[0] || "U").toUpperCase()}
-          </div>
-          <span className="text-sm font-medium hidden sm:inline">{profile?.full_name?.split(" ")[0] || profile?.display_name || "User"}</span>
-        </div>
+        <Link to="/dashboard/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Avatar className="h-8 w-8 border-2 border-primary/30">
+            <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name || "User"} />
+            <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs">
+              {(profile?.full_name?.[0] || profile?.display_name?.[0] || "U").toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-sm font-medium hidden sm:inline">
+            {profile?.full_name?.split(" ")[0] || profile?.display_name || "User"}
+          </span>
+        </Link>
       </div>
     </header>
   );

@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { 
   Map, Target, Clock, Sparkles, Loader2, CheckCircle, 
   Circle, ArrowRight, BookOpen, Code, Briefcase, Users,
-  Trophy, Star, ChevronRight
+  Trophy, Star, ChevronRight, ChevronDown, ChevronUp, 
+  Rocket, FileText, Github, Globe, Award, TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +19,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+interface SkillToLearn {
+  skill: string;
+  explanation: string;
+}
+
+interface MiniProject {
+  title: string;
+  description: string;
+  technologies: string[];
+}
+
+interface Resource {
+  title: string;
+  url: string;
+  type: string;
+  is_free?: boolean;
+}
+
 interface Milestone {
   id: string;
   title: string;
-  description: string;
+  phase?: string;
+  description?: string;
   duration: string;
   status: "completed" | "in_progress" | "pending";
+  goal?: string;
+  skills_to_learn?: SkillToLearn[];
+  what_you_can_do?: string[];
+  mini_project?: MiniProject;
+  deliverable?: string;
+  how_to_know_ready?: string;
+  resources?: Resource[];
+  important_tip?: string;
   tasks: {
     id: string;
     title: string;
@@ -31,12 +59,64 @@ interface Milestone {
   }[];
 }
 
+interface RoleOverview {
+  what_this_role_does: string;
+  companies_that_hire: string[];
+}
+
+interface FinalCareerOutcome {
+  can_build: string[];
+  can_apply_for: string[];
+  interview_level: string;
+}
+
+interface RealWorldPractice {
+  open_source_suggestion: string;
+  portfolio_requirement: string;
+  github_requirement: string;
+  resume_readiness: string;
+}
+
+interface DSAPractice {
+  platforms: string[];
+  topics_to_focus: string[];
+  problems_to_solve: number;
+}
+
+interface SystemDesignBasics {
+  needed: boolean;
+  topics: string[];
+}
+
+interface MockInterview {
+  platforms: string[];
+  frequency: string;
+}
+
+interface InterviewPreparation {
+  dsa_practice: DSAPractice;
+  system_design_basics: SystemDesignBasics;
+  mock_interview: MockInterview;
+}
+
+interface DeploymentJobPhase {
+  how_to_deploy: string;
+  resume_tips: string[];
+  job_application_strategy: string;
+}
+
 interface RoadmapData {
   target_role: string;
   current_level: string;
   experience_level: string;
+  time_commitment?: string;
   total_duration: string;
+  role_overview?: RoleOverview;
+  final_career_outcome?: FinalCareerOutcome;
   milestones: Milestone[];
+  real_world_practice?: RealWorldPractice;
+  interview_preparation?: InterviewPreparation;
+  deployment_job_phase?: DeploymentJobPhase;
   skills_to_learn: string[];
   resources: {
     title: string;
@@ -55,6 +135,7 @@ const DashboardRoadmap = () => {
   const [loading, setLoading] = useState(false);
   const [roadmap, setRoadmap] = useState<RoadmapData | null>(null);
   const [existingRoadmaps, setExistingRoadmaps] = useState<any[]>([]);
+  const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
   const { user } = useAuth();
 
   const handleGenerate = async () => {
@@ -73,9 +154,12 @@ const DashboardRoadmap = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast({ title: "Error", description: "Please sign in first", variant: "destructive" });
+        toast({ title: "Session Expired", description: "Please sign in again", variant: "destructive" });
+        setLoading(false);
         return;
       }
+
+      console.log("Calling generate-roadmap function...");
 
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-roadmap`, {
         method: "POST",
@@ -93,32 +177,43 @@ const DashboardRoadmap = () => {
       });
 
       if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Generation failed");
+        const errData = await resp.json().catch(() => ({}));
+        console.error("Roadmap API error:", resp.status, errData);
+        
+        if (resp.status === 401) {
+          toast({ title: "Session Expired", description: "Please sign in again", variant: "destructive" });
+          return;
+        }
+        throw new Error(errData.error || `Server error (${resp.status})`);
       }
 
       const { roadmap: roadmapData } = await resp.json();
       setRoadmap(roadmapData);
 
       // Save to database
-      await supabase.from("roadmaps").insert({
-        user_id: user?.id,
-        target_role: formData.targetRole,
-        current_level: formData.currentLevel,
-        experience_level: formData.experienceLevel,
-        time_commitment: formData.timeCommitment,
-        roadmap_data: roadmapData,
-      });
+      try {
+        await supabase.from("roadmaps").insert({
+          user_id: user?.id,
+          target_role: formData.targetRole,
+          current_level: formData.currentLevel,
+          experience_level: formData.experienceLevel,
+          time_commitment: formData.timeCommitment,
+          roadmap_data: roadmapData,
+        });
+      } catch (dbError) {
+        console.error("Failed to save roadmap:", dbError);
+        // Don't fail if DB save fails
+      }
 
       toast({
         title: "Roadmap Generated!",
         description: `Your ${formData.targetRole} roadmap is ready`,
       });
     } catch (e: any) {
-      console.error(e);
+      console.error("Roadmap generation error:", e);
       toast({
         title: "Generation Failed",
-        description: e.message,
+        description: e.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -138,6 +233,10 @@ const DashboardRoadmap = () => {
       case "in_progress": return "bg-yellow-500";
       default: return "bg-gray-300";
     }
+  };
+
+  const toggleMilestone = (id: string) => {
+    setExpandedMilestones(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const totalProgress = roadmap 
@@ -294,6 +393,76 @@ const DashboardRoadmap = () => {
             </CardContent>
           </Card>
 
+          {/* Role Overview */}
+          {roadmap.role_overview && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-primary" />
+                  Role Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">{roadmap.role_overview.what_this_role_does}</p>
+                {roadmap.role_overview.companies_that_hire?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Companies That Hire:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {roadmap.role_overview.companies_that_hire.map((company, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">{company}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Final Career Outcome */}
+          {roadmap.final_career_outcome && (
+            <Card className="glass-card bg-gradient-to-r from-primary/5 to-purple-500/5">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Final Career Outcome
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {roadmap.final_career_outcome.can_build?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-green-400 mb-2 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> You Will Be Able To Build:
+                    </p>
+                    <ul className="space-y-1">
+                      {roadmap.final_career_outcome.can_build.map((item, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground pl-4">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {roadmap.final_career_outcome.can_apply_for?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
+                      <Target className="h-3 w-3" /> You Can Apply For:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {roadmap.final_career_outcome.can_apply_for.map((role, idx) => (
+                        <Badge key={idx} className="bg-primary/10 text-primary">{role}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {roadmap.final_career_outcome.interview_level && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg">
+                    <Award className="h-4 w-4 text-amber-400" />
+                    <span className="text-sm font-medium">Interview Level: </span>
+                    <Badge className="bg-amber-500/20 text-amber-400">{roadmap.final_career_outcome.interview_level}</Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Skills to Learn */}
           <Card className="glass-card">
             <CardHeader>
@@ -333,12 +502,21 @@ const DashboardRoadmap = () => {
                   {/* Timeline node */}
                   <div className={`absolute left-4 w-5 h-5 rounded-full ${getStatusColor(milestone.status)} border-4 border-background`} />
                   
-                  <Card className="glass-card">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
+                  <Card className="glass-card overflow-hidden">
+                    {/* Milestone Header - Clickable */}
+                    <div 
+                      className="p-4 cursor-pointer hover:bg-muted/20 transition-colors"
+                      onClick={() => toggleMilestone(milestone.id)}
+                    >
+                      <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           {getMilestoneIcon(idx)}
-                          <h4 className="font-medium">{milestone.title}</h4>
+                          <div>
+                            <h4 className="font-medium">{milestone.title}</h4>
+                            {milestone.phase && (
+                              <p className="text-xs text-primary">{milestone.phase}</p>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">
@@ -348,31 +526,307 @@ const DashboardRoadmap = () => {
                           {milestone.status === "completed" && (
                             <CheckCircle className="h-4 w-4 text-green-500" />
                           )}
+                          {expandedMilestones[milestone.id] ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
                         </div>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground mb-3">{milestone.description}</p>
-                      
-                      <div className="space-y-2">
-                        {milestone.tasks.map((task) => (
-                          <div key={task.id} className="flex items-center gap-2 text-sm">
-                            {task.completed ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className={task.completed ? "line-through text-muted-foreground" : ""}>
-                              {task.title}
-                            </span>
+                      {/* Always show goal if available */}
+                      {milestone.goal && (
+                        <p className="text-sm text-muted-foreground mt-2">{milestone.goal}</p>
+                      )}
+                    </div>
+                    
+                    {/* Expanded Content */}
+                    {expandedMilestones[milestone.id] && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        className="border-t border-border"
+                      >
+                        <div className="p-4 space-y-4">
+                          {/* Skills to Learn */}
+                          {milestone.skills_to_learn?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" /> Skills to Learn:
+                              </p>
+                              <div className="space-y-2">
+                                {milestone.skills_to_learn.map((s, i) => (
+                                  <div key={i} className="bg-muted/10 p-2 rounded">
+                                    <p className="text-sm font-medium">{s.skill}</p>
+                                    <p className="text-xs text-muted-foreground">{s.explanation}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* What You Can Do */}
+                          {milestone.what_you_can_do?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-green-400 mb-2 flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" /> What You'll Be Able To Do:
+                              </p>
+                              <ul className="space-y-1">
+                                {milestone.what_you_can_do.map((item, i) => (
+                                  <li key={i} className="text-sm text-muted-foreground pl-4">• {item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Mini Project */}
+                          {milestone.mini_project && (
+                            <div className="bg-primary/5 p-3 rounded-lg">
+                              <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
+                                <Code className="h-3 w-3" /> Mini Project:
+                              </p>
+                              <p className="text-sm font-medium">{milestone.mini_project.title}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{milestone.mini_project.description}</p>
+                              {milestone.mini_project.technologies?.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {milestone.mini_project.technologies.map((tech, i) => (
+                                    <Badge key={i} className="text-xs bg-blue-500/10 text-blue-400">{tech}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Deliverable */}
+                          {milestone.deliverable && (
+                            <div className="bg-amber-500/5 p-3 rounded-lg">
+                              <p className="text-xs font-semibold text-amber-400 mb-1 flex items-center gap-1">
+                                <FileText className="h-3 w-3" /> Deliverable:
+                              </p>
+                              <p className="text-sm text-muted-foreground">{milestone.deliverable}</p>
+                            </div>
+                          )}
+
+                          {/* How to Know Ready */}
+                          {milestone.how_to_know_ready && (
+                            <div className="bg-green-500/5 p-3 rounded-lg">
+                              <p className="text-xs font-semibold text-green-400 mb-1 flex items-center gap-1">
+                                <Target className="h-3 w-3" /> How To Know You're Ready:
+                              </p>
+                              <p className="text-sm text-muted-foreground">{milestone.how_to_know_ready}</p>
+                            </div>
+                          )}
+
+                          {/* Important Tip */}
+                          {milestone.important_tip && (
+                            <div className="bg-red-500/5 p-3 rounded-lg border border-red-500/20">
+                              <p className="text-xs font-semibold text-red-400 mb-1 flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3" /> Important Tip:
+                              </p>
+                              <p className="text-sm text-muted-foreground">{milestone.important_tip}</p>
+                            </div>
+                          )}
+
+                          {/* Resources for this milestone */}
+                          {milestone.resources?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-purple-400 mb-2 flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" /> Resources:
+                              </p>
+                              <div className="space-y-2">
+                                {milestone.resources.map((res, i) => (
+                                  <a
+                                    key={i}
+                                    href={res.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 p-2 rounded bg-muted/30 hover:bg-muted/50 transition-colors"
+                                  >
+                                    <BookOpen className="h-4 w-4 text-primary" />
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium">{res.title}</p>
+                                      <p className="text-xs text-muted-foreground">{res.type} {res.is_free !== undefined && (res.is_free ? '• Free' : '• Paid')}</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tasks */}
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">Tasks:</p>
+                            <div className="space-y-2">
+                              {milestone.tasks.map((task) => (
+                                <div key={task.id} className="flex items-center gap-2 text-sm">
+                                  {task.completed ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <Circle className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                  <span className={task.completed ? "line-through text-muted-foreground" : ""}>
+                                    {task.title}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
+                        </div>
+                      </motion.div>
+                    )}
                   </Card>
                 </motion.div>
               ))}
             </div>
           </div>
+
+          {/* Real World Practice */}
+          {roadmap.real_world_practice && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-primary" />
+                  Real-World Practice
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {roadmap.real_world_practice.open_source_suggestion && (
+                  <div className="bg-muted/10 p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-400 mb-1 flex items-center gap-1">
+                      <Github className="h-3 w-3" /> Open Source:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.real_world_practice.open_source_suggestion}</p>
+                  </div>
+                )}
+                {roadmap.real_world_practice.portfolio_requirement && (
+                  <div className="bg-muted/10 p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-purple-400 mb-1 flex items-center gap-1">
+                      <Briefcase className="h-3 w-3" /> Portfolio:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.real_world_practice.portfolio_requirement}</p>
+                  </div>
+                )}
+                {roadmap.real_world_practice.github_requirement && (
+                  <div className="bg-muted/10 p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-green-400 mb-1 flex items-center gap-1">
+                      <Github className="h-3 w-3" /> GitHub:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.real_world_practice.github_requirement}</p>
+                  </div>
+                )}
+                {roadmap.real_world_practice.resume_readiness && (
+                  <div className="bg-muted/10 p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-amber-400 mb-1 flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Resume:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.real_world_practice.resume_readiness}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Interview Preparation */}
+          {roadmap.interview_preparation && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Award className="h-5 w-5 text-yellow-500" />
+                  Interview Preparation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {roadmap.interview_preparation.dsa_practice && (
+                  <div className="bg-blue-500/5 p-4 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-1">
+                      <Code className="h-3 w-3" /> DSA Practice:
+                    </p>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {roadmap.interview_preparation.dsa_practice.platforms?.map((p, i) => (
+                          <Badge key={i} className="bg-blue-500/10 text-blue-400">{p}</Badge>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Focus: {roadmap.interview_preparation.dsa_practice.topics_to_focus?.join(", ")}
+                      </p>
+                      <p className="text-sm font-medium text-primary">
+                        Solve {roadmap.interview_preparation.dsa_practice.problems_to_solve}+ problems
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {roadmap.interview_preparation.system_design_basics?.needed && (
+                  <div className="bg-purple-500/5 p-4 rounded-lg">
+                    <p className="text-xs font-semibold text-purple-400 mb-2 flex items-center gap-1">
+                      <Map className="h-3 w-3" /> System Design:
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {roadmap.interview_preparation.system_design_basics.topics?.join(", ")}
+                    </p>
+                  </div>
+                )}
+                {roadmap.interview_preparation.mock_interview && (
+                  <div className="bg-green-500/5 p-4 rounded-lg">
+                    <p className="text-xs font-semibold text-green-400 mb-2 flex items-center gap-1">
+                      <Users className="h-3 w-3" /> Mock Interviews:
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {roadmap.interview_preparation.mock_interview.platforms?.map((p, i) => (
+                        <Badge key={i} className="bg-green-500/10 text-green-400">{p}</Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Frequency: {roadmap.interview_preparation.mock_interview.frequency}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Deployment & Job Application */}
+          {roadmap.deployment_job_phase && (
+            <Card className="glass-card bg-gradient-to-r from-green-500/5 to-primary/5">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Rocket className="h-5 w-5 text-green-400" />
+                  Deployment & Job Application
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {roadmap.deployment_job_phase.how_to_deploy && (
+                  <div>
+                    <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
+                      <Globe className="h-3 w-3" /> Deploy Projects:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.deployment_job_phase.how_to_deploy}</p>
+                  </div>
+                )}
+                {roadmap.deployment_job_phase.resume_tips?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Resume Tips:
+                    </p>
+                    <ul className="space-y-1">
+                      {roadmap.deployment_job_phase.resume_tips.map((tip, i) => (
+                        <li key={i} className="text-sm text-muted-foreground pl-4">• {tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {roadmap.deployment_job_phase.job_application_strategy && (
+                  <div className="bg-primary/5 p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
+                      <Target className="h-3 w-3" /> Job Application Strategy:
+                    </p>
+                    <p className="text-sm text-muted-foreground">{roadmap.deployment_job_phase.job_application_strategy}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Resources */}
           <Card className="glass-card">

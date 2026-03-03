@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 export function useInactivityLogout(timeoutMinutes: number = 5, enabled: boolean = true) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<Date>(new Date());
+  const pausedAtRef = useRef<Date | null>(null);
 
   const logout = async () => {
     console.log('Session expired due to inactivity, logging out...');
@@ -26,6 +27,10 @@ export function useInactivityLogout(timeoutMinutes: number = 5, enabled: boolean
     if (enabled) {
       timeoutRef.current = setTimeout(() => {
         const now = new Date();
+        // If tab/app is not visible, do not count hidden time as inactivity.
+        if (document.visibilityState !== 'visible') {
+          return;
+        }
         const diffMs = now.getTime() - lastActivityRef.current.getTime();
         const diffMins = diffMs / (1000 * 60);
         
@@ -53,10 +58,27 @@ export function useInactivityLogout(timeoutMinutes: number = 5, enabled: boolean
     // Initialize timer
     resetTimer();
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pausedAtRef.current = new Date();
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        return;
+      }
+
+      // Visible again: treat this as activity and restart timer.
+      pausedAtRef.current = null;
+      resetTimer();
+    };
+
     // Add event listeners
     events.forEach(event => {
       window.addEventListener(event, resetTimer, { passive: true });
     });
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Cleanup
     return () => {
@@ -66,6 +88,8 @@ export function useInactivityLogout(timeoutMinutes: number = 5, enabled: boolean
       events.forEach(event => {
         window.removeEventListener(event, resetTimer);
       });
+
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [timeoutMinutes, enabled]);
 

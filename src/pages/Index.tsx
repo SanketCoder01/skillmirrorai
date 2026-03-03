@@ -5,7 +5,6 @@ import StatsSection from "@/components/landing/StatsSection";
 import TimelineSection from "@/components/landing/TimelineSection";
 import SkillGalaxy from "@/components/landing/SkillGalaxy";
 import TestimonialsSection from "@/components/landing/TestimonialsSection";
-import AboutSection from "@/components/landing/AboutSection";
 
 const Index = () => (
   <div className="min-h-screen bg-background">
@@ -16,7 +15,6 @@ const Index = () => (
       <TimelineSection />
       <SkillGalaxy />
       <TestimonialsSection />
-      <AboutSection />
     </main>
     <Footer />
   </div>

@@ -43,11 +43,29 @@ const RecruiterRegister = () => {
     setLoading(true);
 
     try {
-      // Create auth user
-      const { data: { user }, error: authError } = await supabase.auth.signUp({
+      // Insert into recruiter_requests table (pending approval)
+      const { error: requestError } = await supabase
+        .from("recruiter_requests")
+        .insert({
+          full_name: formData.full_name,
+          email: formData.email,
+          company: formData.company_name,
+          company_website: formData.company_website || null,
+          phone: formData.phone,
+          position: formData.designation || null,
+          country: formData.country,
+          status: "pending",
+          user_id: null,
+        });
+
+      if (requestError) throw requestError;
+
+      // Create auth user with email confirmation required (best-effort)
+      const { data: { user, session }, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/recruiter/login`,
           data: {
             role: "recruiter",
             full_name: formData.full_name,
@@ -55,33 +73,31 @@ const RecruiterRegister = () => {
         },
       });
 
-      if (authError) throw authError;
-
-      if (user) {
-        // Create recruiter profile
-        const { error: profileError } = await supabase
-          .from("recruiters")
-          .insert({
-            user_id: user.id,
-            full_name: formData.full_name,
-            email: formData.email,
-            company_name: formData.company_name,
-            company_website: formData.company_website,
-            phone: formData.phone,
-            designation: formData.designation,
-            country: formData.country,
-            status: "pending",
+      if (!authError && user?.id) {
+        // Link the request to the auth user (non-blocking)
+        supabase
+          .from("recruiter_requests")
+          .update({ user_id: user.id })
+          .eq("email", formData.email)
+          .then(({ error }) => {
+            if (error) console.error("Failed to link user_id to recruiter request:", error);
           });
+      }
 
-        if (profileError) throw profileError;
-
+      // Check if email confirmation is required
+      if (user && !session) {
+        toast({
+          title: "Confirmation Email Sent",
+          description: "Please check your email to verify your account. After verification, your recruiter request will be reviewed by admin.",
+        });
+      } else {
         toast({
           title: "Registration Submitted",
-          description: "Your request has been submitted for approval. You will receive an email once approved.",
+          description: "Your recruiter request has been submitted for approval. You will receive an email once approved.",
         });
-
-        navigate("/recruiter/login");
       }
+
+      navigate("/recruiter/login");
     } catch (error: any) {
       console.error(error);
       toast({ title: "Error", description: error.message || "Registration failed", variant: "destructive" });

@@ -178,6 +178,15 @@ const CompleteProfile = () => {
       return;
     }
 
+    if (!resumeFile) {
+      toast({
+        title: "Resume Required",
+        description: "Please upload your resume/CV to complete your profile. This is mandatory for resume analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setUploadProgress(0);
 
@@ -489,12 +498,13 @@ const CompleteProfile = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                <span>Resume / CV</span>
+                <span>Resume / CV *</span>
+                <span className="text-xs text-amber-500">(Required)</span>
               </div>
               
               <div 
                 onClick={() => resumeInputRef.current?.click()}
-                className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+                className="border-2 border-dashed border-primary/50 rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors bg-primary/5"
               >
                 <input
                   ref={resumeInputRef}
@@ -511,7 +521,8 @@ const CompleteProfile = () => {
                 ) : (
                   <div className="text-muted-foreground">
                     <Upload className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">Click to upload your CV (PDF, max 10MB)</p>
+                    <p className="text-sm font-medium">Click to upload your CV (PDF, max 10MB) *</p>
+                    <p className="text-xs text-amber-500 mt-1">Resume is mandatory for profile completion</p>
                   </div>
                 )}
               </div>
