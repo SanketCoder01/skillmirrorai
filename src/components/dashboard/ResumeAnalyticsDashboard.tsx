@@ -576,7 +576,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                 </motion.div>
                 <h3 className="text-xl font-semibold mb-2">Analyzing Your Resume</h3>
                 <p className="text-muted-foreground mb-6 max-w-md">
-                  Our AI is extracting skills, analyzing experience, and generating insights. This may take 30-60 seconds.
+                  AI is analyzing your skills and experience. This usually takes 10-20 seconds.
                 </p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <motion.div

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, CheckCircle, User, GraduationCap, MapPin, Linkedin, Github, Upload, FileText, Image, X, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +11,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SplineBackground from "@/components/SplineBackground";
+
+// PDF.js for client-side text extraction
+import * as pdfjsLib from "pdfjs-dist";
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const CURRENT_YEAR = new Date().getFullYear();
 const GRADUATION_YEARS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR + i);
@@ -41,6 +45,7 @@ const CompleteProfile = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeText, setResumeText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -118,6 +123,25 @@ const CompleteProfile = () => {
     }));
   };
 
+  // Extract text from PDF client-side
+  const extractPdfText = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        fullText += pageText + "\n";
+      }
+      return fullText.trim();
+    } catch (error) {
+      console.error("PDF extraction error:", error);
+      return "";
+    }
+  };
+
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -136,7 +160,7 @@ const CompleteProfile = () => {
     }
   };
 
-  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
@@ -148,6 +172,14 @@ const CompleteProfile = () => {
         return;
       }
       setResumeFile(file);
+      // Extract text from PDF immediately
+      const text = await extractPdfText(file);
+      setResumeText(text);
+      if (text) {
+        toast({ title: "Resume loaded", description: `Extracted ${text.length} characters from resume` });
+      } else {
+        toast({ title: "Warning", description: "Could not extract text from PDF. Analysis may be limited.", variant: "destructive" });
+      }
     }
   };
 
@@ -232,6 +264,7 @@ const CompleteProfile = () => {
           bio: formData.bio || null,
           avatar_url: avatarUrl,
           resume_url: resumeUrl,
+          resume_text: resumeText, // Store extracted text for fast analysis
           role: "student",
           profile_completed: true,
           verification_status: "profile_completed",
@@ -270,21 +303,21 @@ const CompleteProfile = () => {
         description: "Your profile has been saved. Analyzing your resume...",
       });
 
-      // Trigger automatic resume analysis in background
-      if (resumeUrl) {
+      // Trigger automatic resume analysis in background (using pre-extracted text)
+      if (resumeUrl && resumeText) {
         try {
           // Get session for auth token
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            // Call auto-analyze-resume function (handles PDF parsing properly)
-            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-analyze-resume`, {
+            // Call analyze-resume with pre-extracted text (FAST - no PDF parsing)
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session.access_token}`,
               },
               body: JSON.stringify({
-                resumeUrl: resumeUrl,
+                resumeText: resumeText,
                 targetRole: formData.research_interest || undefined,
                 location: formData.country,
               }),

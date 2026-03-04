@@ -6,10 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GROQ_MODEL = "openai/gpt-oss-120b";
-const MAX_RESUME_CHARS = 12000;
-const MAX_JOB_CHARS = 6000;
-const FETCH_TIMEOUT_MS = 60000;
+const GROQ_MODEL = "llama-3.3-70b-versatile"; // Fast model
+const MAX_RESUME_CHARS = 8000;
+const MAX_JOB_CHARS = 4000;
+const FETCH_TIMEOUT_MS = 30000;
 
 async function callGroqLLM(apiKey: string, prompt: string): Promise<string> {
   const controller = new AbortController();
@@ -28,7 +28,7 @@ async function callGroqLLM(apiKey: string, prompt: string): Promise<string> {
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_completion_tokens: 4096,
+      max_completion_tokens: 2048,
       top_p: 1,
     }),
     signal: controller.signal,
@@ -82,93 +82,34 @@ serve(async (req) => {
     const safeResumeText = resumeText.slice(0, MAX_RESUME_CHARS);
     const safeJobDescription = typeof jobDescription === "string" ? jobDescription.slice(0, MAX_JOB_CHARS) : jobDescription;
 
-    const prompt = `You are an expert career analyst AI for SkillMirror. Analyze the following resume and provide comprehensive career insights.
+    const prompt = `Analyze this resume and return ONLY JSON (no markdown):
 
-Resume Text:
+Resume:
 ${safeResumeText}
 
-${safeJobDescription ? `Job Description:\n${safeJobDescription}` : "No specific job description provided. Do a general career analysis based on the resume."}
+${safeJobDescription ? `Job Description:\n${safeJobDescription}` : ""}
 
-${targetRole ? `Target Job Role: ${targetRole}` : ""}
-${location ? `Preferred Location: ${location}` : ""}
-
-IMPORTANT INSTRUCTIONS:
-1. Analyze the resume based on its content - skills, experience, projects, education
-2. If location is India or not specified, show salary in INR (₹) format based on Indian market rates
-3. If location is outside India, show salary in USD ($) format
-4. Be realistic with salary estimates based on experience level and skills shown in resume
-5. Focus on what the resume demonstrates, not what might be missing from a job description
-
-Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
+Return this JSON structure:
 {
-  "profileSummary": "2-3 sentence professional summary based on resume content",
-  "coreSkills": ["skill1", "skill2"] - technical skills found in resume,
-  "softSkills": ["skill1", "skill2"] - soft skills evident from resume,
-  "missingSkills": ["skill1", "skill2"] - skills that would benefit career growth,
-  "matchScore": 75 - overall resume strength score (0-100),
-  "ATSScore": 70 - ATS compatibility score (0-100),
-  "careerLevel": "Junior|Mid|Senior|Lead" - based on experience in resume,
-  "suggestedCareerFields": ["field1", "field2"] - based on skills in resume,
-  "strengths": ["strength1", "strength2"] - areas where resume shows strength,
-  "weaknesses": ["weakness1", "weakness2"] - areas needing improvement,
-  "improvementSuggestions": ["suggestion1", "suggestion2"] - actionable improvements,
-  "suggestedProjects": [{"title": "Project Name", "description": "Brief description"}] - projects to build missing skills,
-  "certifications": ["cert1", "cert2"] - recommended certifications based on career path,
-  "marketDemandLevel": "High|Medium|Low" - demand for this profile in Indian market,
-  "estimatedSalaryRange": "₹X,00,000 - ₹Y,00,000 per annum" OR "$XX,000 - $YY,000 per annum",
-  "salaryInsights": {
-    "currency": "INR|USD",
-    "minSalary": number - minimum expected salary,
-    "maxSalary": number - maximum expected salary,
-    "averageSalary": number - average for this profile,
-    "experienceMultiplier": number - factor based on experience level,
-    "locationFactor": "Metro|Tier-2|Remote" - location impact on salary
-  },
-  "thirtyDayRoadmap": [{"week": 1, "tasks": ["task1", "task2"]}, {"week": 2, "tasks": ["task1"]}, {"week": 3, "tasks": ["task1"]}, {"week": 4, "tasks": ["task1"]}],
-  "resumeRewriteSuggestions": ["suggestion1", "suggestion2"] - specific improvements for resume,
-  "jobSearchKeywords": ["keyword1", "keyword2"] - keywords for job search,
-  "relatedJobTitles": [{"title": "Job Title", "description": "Brief description", "matchPercentage": number}],
-  "keyActions": ["action1", "action2", "action3"] - immediate action items,
-  "skillsToFocus": ["skill1", "skill2", "skill3"] - priority skills to develop,
-  "bestCareerDirection": "One sentence direction based on resume analysis",
-  "riskFactors": ["risk1", "risk2"] - potential career risks,
-  "skillCategories": {
-    "frontend": number - percentage of frontend skills,
-    "backend": number - percentage of backend skills,
-    "database": number - percentage of database skills,
-    "cloud": number - percentage of cloud/DevOps skills,
-    "tools": number - percentage of tools proficiency,
-    "softSkills": number - percentage of soft skills
-  },
-  "skillProficiency": {"skillName": score 0-10} - proficiency score for each skill,
-  "experience": {
-    "internships": number,
-    "freelance": number,
-    "fullTime": number,
-    "academicProjects": number,
-    "totalYears": number
-  },
-  "careerGrowth": [{"year": "2021", "roles": number, "projects": number}] - year-wise growth,
-  "sectionCompleteness": {
-    "summary": number 0-100,
-    "skills": number 0-100,
-    "projects": number 0-100,
-    "certifications": number 0-100,
-    "achievements": number 0-100
-  },
-  "technologyUsage": {"technology": count} - frequency of technology mentions,
-  "aiInsights": {
-    "bestFitRole": "Role title",
-    "bestFitScore": number 0-100,
-    "skillGaps": ["skill1", "skill2"],
-    "strongAreas": ["area1", "area2"]
-  },
-  "jobMatch": {
-    "score": number 0-100,
-    "matchedSkills": ["skill1", "skill2"],
-    "missingSkills": ["skill1", "skill2"]
-  }
-}`;
+  "profileSummary": "2-3 sentence summary",
+  "coreSkills": ["skill1", "skill2"],
+  "softSkills": ["skill1"],
+  "missingSkills": ["skill1"],
+  "matchScore": 75,
+  "ATSScore": 70,
+  "careerLevel": "Junior|Mid|Senior",
+  "strengths": ["strength1"],
+  "weaknesses": ["weakness1"],
+  "improvementSuggestions": ["suggestion1"],
+  "estimatedSalaryRange": "₹3,00,000 - ₹6,00,000",
+  "skillCategories": {"frontend": 30, "backend": 25, "database": 15, "cloud": 10, "tools": 10, "softSkills": 10},
+  "skillProficiency": {"skill": 8},
+  "experience": {"internships": 0, "freelance": 0, "fullTime": 0, "academicProjects": 2, "totalYears": 0},
+  "aiInsights": {"bestFitRole": "Role", "bestFitScore": 80, "skillGaps": ["skill"], "strongAreas": ["area"]},
+  "jobMatch": {"score": 75, "matchedSkills": ["skill"], "missingSkills": ["skill"]}
+}
+
+Be concise. Estimate scores 0-100.`;
 
     let content = "";
     try {
