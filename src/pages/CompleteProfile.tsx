@@ -267,8 +267,38 @@ const CompleteProfile = () => {
 
       toast({
         title: "✅ Profile completed!",
-        description: "Your profile has been saved successfully.",
+        description: "Your profile has been saved. Analyzing your resume...",
       });
+
+      // Trigger automatic resume analysis in background
+      if (resumeUrl) {
+        try {
+          // Fetch the resume text from storage for analysis
+          const response = await fetch(resumeUrl);
+          const resumeText = await response.text();
+          
+          // Get session for auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && resumeText) {
+            // Call analyze-resume function
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                resumeText: resumeText,
+                targetRole: formData.research_interest || undefined,
+                location: formData.country,
+              }),
+            }).catch(err => console.error("Background analysis error:", err));
+          }
+        } catch (analysisError) {
+          console.error("Failed to start resume analysis:", analysisError);
+          // Don't block navigation if analysis fails
+        }
+      }
 
       navigate("/dashboard", { replace: true });
     } catch (error: any) {

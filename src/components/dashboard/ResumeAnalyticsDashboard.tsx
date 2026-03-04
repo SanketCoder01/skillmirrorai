@@ -360,6 +360,8 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
   const { user } = useAuth();
   const [resumeData, setResumeData] = useState<ResumeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analysisInProgress, setAnalysisInProgress] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
 
   useEffect(() => {
     if (user?.id) {
@@ -367,7 +369,18 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
     }
   }, [user?.id]);
 
-  const fetchResumeData = async () => {
+  // Poll for analysis results if in progress
+  useEffect(() => {
+    if (analysisInProgress && pollCount < 30) {
+      const interval = setInterval(() => {
+        fetchResumeData(true);
+        setPollCount(prev => prev + 1);
+      }, 3000); // Poll every 3 seconds
+      return () => clearInterval(interval);
+    }
+  }, [analysisInProgress, pollCount]);
+
+  const fetchResumeData = async (isPolling = false) => {
     try {
       // Fetch resume analysis data
       const { data: analysisData } = await supabase
@@ -383,18 +396,18 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
         
         // Parse and structure the resume data
         const parsedData: ResumeData = {
-          resumeScore: results.resumeScore || results.overallScore || analysisData.match_score || 75,
-          atsScore: results.atsScore || results.ats_score || 82,
-          totalSkills: results.skills?.length || Object.keys(results.skill_scores || {}).length || 12,
-          experienceYears: results.experienceYears || results.yearsOfExperience || 2,
-          skills: results.skills || [],
+          resumeScore: results.resumeScore || results.overallScore || results.matchScore || analysisData.match_score || 75,
+          atsScore: results.atsScore || results.ats_score || results.ATSScore || 82,
+          totalSkills: results.skills?.length || results.coreSkills?.length || Object.keys(results.skill_scores || results.skillProficiency || {}).length || 12,
+          experienceYears: results.experienceYears || results.yearsOfExperience || results.experience?.totalYears || 2,
+          skills: results.skills || results.coreSkills || [],
           skillCategories: results.skillCategories || {
-            frontend: 35,
-            backend: 25,
-            database: 15,
-            cloud: 10,
-            tools: 10,
-            softSkills: 5,
+            frontend: results.skillCategories?.frontend || 35,
+            backend: results.skillCategories?.backend || 25,
+            database: results.skillCategories?.database || 15,
+            cloud: results.skillCategories?.cloud || 10,
+            tools: results.skillCategories?.tools || 10,
+            softSkills: results.skillCategories?.softSkills || 5,
           },
           skillProficiency: results.skill_scores || results.skillProficiency || {
             "React": 9,
@@ -434,20 +447,33 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
             "TypeScript": 3,
           },
           aiInsights: results.aiInsights || {
-            bestFitRole: "Frontend Developer",
-            bestFitScore: 85,
-            skillGaps: ["GraphQL", "Docker", "CI/CD"],
-            strongAreas: ["React", "JavaScript", "UI/UX"],
+            bestFitRole: results.bestCareerDirection || "Frontend Developer",
+            bestFitScore: results.aiInsights?.bestFitScore || 85,
+            skillGaps: results.missingSkills || results.aiInsights?.skillGaps || ["GraphQL", "Docker", "CI/CD"],
+            strongAreas: results.strengths || results.aiInsights?.strongAreas || ["React", "JavaScript", "UI/UX"],
           },
           jobMatch: results.jobMatch || {
-            score: 78,
-            matchedSkills: ["React", "JavaScript", "Node.js", "MongoDB"],
-            missingSkills: ["GraphQL", "Docker"],
+            score: results.matchScore || 78,
+            matchedSkills: results.coreSkills || ["React", "JavaScript", "Node.js", "MongoDB"],
+            missingSkills: results.missingSkills || ["GraphQL", "Docker"],
           },
         };
 
         setResumeData(parsedData);
+        setAnalysisInProgress(false); // Analysis complete
       } else {
+        // Check if user has a resume URL but no analysis yet - analysis might be in progress
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("resume_url")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        
+        if (profileData?.resume_url && !isPolling) {
+          // Resume exists but no analysis - might be processing
+          setAnalysisInProgress(true);
+        }
+        
         // Default data if no analysis exists
         setResumeData({
           resumeScore: 0,
@@ -531,29 +557,57 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
             <h1 className="text-2xl font-display font-bold">
               Welcome, <span className="text-primary">{profile?.full_name?.split(" ")[0] || "User"}</span>!
             </h1>
-            <p className="text-muted-foreground mt-1">Upload your resume to see analytics</p>
+            <p className="text-muted-foreground mt-1">
+              {analysisInProgress ? "Analyzing your resume..." : "Upload your resume to see analytics"}
+            </p>
           </div>
         </div>
 
         <Card className="border border-dashed border-border/50 bg-card/30">
           <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-              className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
-            >
-              <FileText className="h-10 w-10 text-primary" />
-            </motion.div>
-            <h3 className="text-xl font-semibold mb-2">No Resume Data Yet</h3>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Upload and analyze your resume to see detailed insights about your skills, experience, and career fit.
-            </p>
-            <Button asChild>
-              <a href="/dashboard/analysis">
-                <Zap className="h-4 w-4 mr-2" />
-                Analyze Your Resume
-              </a>
-            </Button>
+            {analysisInProgress ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                  className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
+                >
+                  <Sparkles className="h-10 w-10 text-primary" />
+                </motion.div>
+                <h3 className="text-xl font-semibold mb-2">Analyzing Your Resume</h3>
+                <p className="text-muted-foreground mb-6 max-w-md">
+                  Our AI is extracting skills, analyzing experience, and generating insights. This may take 30-60 seconds.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <motion.div
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                  >
+                    Processing...
+                  </motion.div>
+                </div>
+              </>
+            ) : (
+              <>
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                  className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
+                >
+                  <FileText className="h-10 w-10 text-primary" />
+                </motion.div>
+                <h3 className="text-xl font-semibold mb-2">No Resume Data Yet</h3>
+                <p className="text-muted-foreground mb-6 max-w-md">
+                  Complete your profile and upload your resume to see detailed insights about your skills and experience.
+                </p>
+                <Button asChild>
+                  <a href="/dashboard/profile">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Complete Profile
+                  </a>
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
