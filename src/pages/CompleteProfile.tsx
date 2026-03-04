@@ -46,7 +46,7 @@ const CompleteProfile = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, generateSkillMirrorId } = useAuth();
   const navigate = useNavigate();
 
   // Calculate profile progress
@@ -233,6 +233,8 @@ const CompleteProfile = () => {
           avatar_url: avatarUrl,
           resume_url: resumeUrl,
           role: "student",
+          profile_completed: true,
+          verification_status: "profile_completed",
         }, { onConflict: "user_id" });
 
       if (profileError) throw profileError;
@@ -259,6 +261,8 @@ const CompleteProfile = () => {
 
       setUploadProgress(100);
 
+      // Ensure SkillMirror ID is generated once profile is marked completed
+      await generateSkillMirrorId(user!.id);
       await refreshProfile();
 
       toast({
@@ -266,7 +270,7 @@ const CompleteProfile = () => {
         description: "Your profile has been saved successfully.",
       });
 
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       console.error("Profile completion error:", error);
       toast({
