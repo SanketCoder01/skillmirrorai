@@ -68,9 +68,34 @@ serve(async (req) => {
     if (claimsError || !data?.claims) throw new Error("Unauthorized");
     const userId = data.claims.sub as string;
 
-    const { resumeText, jobDescription, targetRole, location } = await req.json();
-    if (!resumeText || typeof resumeText !== "string") {
-      return new Response(JSON.stringify({ error: "Resume text is required" }), {
+    const { resumeText, resumeUrl, jobDescription, targetRole, location } = await req.json();
+    
+    let finalResumeText = resumeText;
+    
+    // If no text provided but URL is available, fetch and parse PDF
+    if (!finalResumeText && resumeUrl) {
+      console.log("No text provided, fetching from URL:", resumeUrl);
+      try {
+        const pdfResponse = await fetch(resumeUrl);
+        if (pdfResponse.ok) {
+          const pdfBuffer = await pdfResponse.arrayBuffer();
+          // Simple text extraction - try to get readable content
+          const decoder = new TextDecoder("utf-8", { fatal: false });
+          const rawText = decoder.decode(pdfBuffer);
+          // Clean up binary artifacts and extract readable text
+          finalResumeText = rawText
+            .replace(/[^\x20-\x7E\n\r\t]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          console.log("Extracted text length from PDF:", finalResumeText.length);
+        }
+      } catch (fetchError) {
+        console.error("Failed to fetch PDF:", fetchError);
+      }
+    }
+    
+    if (!finalResumeText || typeof finalResumeText !== "string" || finalResumeText.length < 50) {
+      return new Response(JSON.stringify({ error: "Could not extract resume text. Please ensure PDF has selectable text." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -79,7 +104,7 @@ serve(async (req) => {
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
-    const safeResumeText = resumeText.slice(0, MAX_RESUME_CHARS);
+    const safeResumeText = finalResumeText.slice(0, MAX_RESUME_CHARS);
     const safeJobDescription = typeof jobDescription === "string" ? jobDescription.slice(0, MAX_JOB_CHARS) : jobDescription;
 
     const prompt = `Analyze this resume and return ONLY JSON (no markdown):
@@ -147,12 +172,13 @@ Be concise. Estimate scores 0-100.`;
 
     const { error: insertError } = await supabase.from("analyses").insert({
       user_id: userId,
-      resume_text: resumeText?.substring(0, 5000),
+      resume_text: finalResumeText?.substring(0, 5000),
       job_description: jobDescription?.substring(0, 3000),
       target_role: targetRole,
       location: location,
       results_json: results,
       match_score: results.matchScore || 0,
+      analysis_status: "done",
     });
 
     if (insertError) console.error("Insert error:", insertError);

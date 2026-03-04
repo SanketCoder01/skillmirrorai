@@ -303,30 +303,46 @@ const CompleteProfile = () => {
         description: "Your profile has been saved. Analyzing your resume...",
       });
 
-      // Trigger automatic resume analysis in background (using pre-extracted text)
-      if (resumeUrl && resumeText) {
+      // Trigger automatic resume analysis in background
+      if (resumeUrl) {
         try {
           // Get session for auth token
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            // Call analyze-resume with pre-extracted text (FAST - no PDF parsing)
+            // Use pre-extracted text if available, otherwise the function will fetch from URL
+            const analysisPayload: any = {
+              targetRole: formData.research_interest || undefined,
+              location: formData.country,
+            };
+            
+            if (resumeText && resumeText.length > 50) {
+              // Send pre-extracted text (FAST path)
+              analysisPayload.resumeText = resumeText;
+            } else {
+              // Send URL for server-side extraction (fallback)
+              analysisPayload.resumeUrl = resumeUrl;
+            }
+            
+            console.log("Triggering analysis with payload:", analysisPayload.resumeText ? "pre-extracted text" : "URL");
+            
+            // Call analyze-resume function
             fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session.access_token}`,
               },
-              body: JSON.stringify({
-                resumeText: resumeText,
-                targetRole: formData.research_interest || undefined,
-                location: formData.country,
-              }),
-            }).catch(err => console.error("Background analysis error:", err));
+              body: JSON.stringify(analysisPayload),
+            }).then(response => response.json())
+              .then(data => console.log("Analysis response:", data))
+              .catch(err => console.error("Background analysis error:", err));
           }
         } catch (analysisError) {
           console.error("Failed to start resume analysis:", analysisError);
           // Don't block navigation if analysis fails
         }
+      } else {
+        console.log("No resume URL, skipping analysis");
       }
 
       navigate("/dashboard", { replace: true });
