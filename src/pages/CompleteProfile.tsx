@@ -273,22 +273,18 @@ const CompleteProfile = () => {
       // Trigger automatic resume analysis in background
       if (resumeUrl) {
         try {
-          // Fetch the resume text from storage for analysis
-          const response = await fetch(resumeUrl);
-          const resumeText = await response.text();
-          
           // Get session for auth token
           const { data: { session } } = await supabase.auth.getSession();
-          if (session && resumeText) {
-            // Call analyze-resume function
-            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
+          if (session) {
+            // Call auto-analyze-resume function (handles PDF parsing properly)
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-analyze-resume`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session.access_token}`,
               },
               body: JSON.stringify({
-                resumeText: resumeText,
+                resumeUrl: resumeUrl,
                 targetRole: formData.research_interest || undefined,
                 location: formData.country,
               }),
