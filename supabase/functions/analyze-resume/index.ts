@@ -138,15 +138,24 @@ Return this JSON structure:
   "keyActions": ["action1", "action2"],
   "skillsToFocus": ["skill1", "skill2"],
   "bestCareerDirection": "Clear career direction recommendation",
-  "riskFactors": ["risk1", "risk2"]
+  "riskFactors": ["risk1", "risk2"],
+  "skillCategories": {"category1": 30, "category2": 25, "category3": 20, "category4": 15, "category5": 10},
+  "skillProficiency": {"skill1": 9, "skill2": 8, "skill3": 7},
+  "experience": {"internships": 0, "freelance": 0, "fullTime": 0, "academicProjects": 0, "totalYears": 0}
 }
 
-IMPORTANT:
+CRITICAL RULES:
+- Analyze the ACTUAL resume content - do NOT assume any specific industry or profession
+- If resume is for a teacher, analyze teaching skills, NOT coding skills
+- If resume is for a doctor, analyze medical skills, NOT coding skills
+- Extract skills that are ACTUALLY mentioned or clearly implied in the resume
+- skillCategories should be RELEVANT to the profession (e.g., for teacher: "Teaching Methods", "Curriculum Design", "Student Engagement", "Assessment", "Communication")
+- skillProficiency should list actual skills from the resume with proficiency scores 1-10
 - Exactly 3 strengths in simple, easy-to-understand language
 - Exactly 3 areas of improvement (weaknesses) in simple language
 - At least 2 improvement suggestions
-- Exactly 3 suggested projects maximum
-- Exactly 3 real, current job titles that match the resume profile
+- Exactly 3 suggested projects relevant to the profession
+- Exactly 3 real job titles that match the resume profile
 - Be concise. Estimate scores 0-100. Include 4 weeks in roadmap with 2-3 tasks each.`;
 
     let content = "";
