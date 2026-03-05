@@ -648,6 +648,8 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
       {/* ================================ */}
       {/* SECTION 2: SKILLS ANALYSIS */}
       {/* ================================ */}
+      {/* Only show if there are skill categories or proficiency data */}
+      {(skillCategoryData.length > 0 && skillCategoryData.some(d => d.value > 0)) && (
       <div className="grid md:grid-cols-2 gap-6">
         {/* Donut Chart - Skill Categories */}
         <motion.div
@@ -717,6 +719,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
         </motion.div>
 
         {/* Bar Chart - Top Skills */}
+        {skillProficiencyData.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -762,11 +765,15 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
             </CardContent>
           </Card>
         </motion.div>
+        )}
       </div>
+      )}
 
       {/* ================================ */}
       {/* SECTION 3: EXPERIENCE ANALYSIS */}
       {/* ================================ */}
+      {/* Only show if there is experience data */}
+      {(resumeData.careerGrowth.length > 0 || experienceBarData.some(d => d.value > 0)) && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -783,6 +790,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Line Chart - Career Growth */}
+              {resumeData.careerGrowth.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium mb-3 text-muted-foreground">Career Growth Trend</h4>
                 <div className="h-36 sm:h-44">
@@ -830,8 +838,10 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Experience Bars */}
+              {experienceBarData.some(d => d.value > 0) && (
               <div>
                 <h4 className="text-sm font-medium mb-3 text-muted-foreground">Experience Breakdown</h4>
                 <div className="space-y-4">
@@ -847,14 +857,18 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                   ))}
                 </div>
               </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       {/* ================================ */}
       {/* SECTION 4: RESUME COMPLETENESS */}
       {/* ================================ */}
+      {/* Only show if any section has completeness > 0 */}
+      {Object.values(resumeData.sectionCompleteness).some(v => v > 0) && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -870,44 +884,57 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 py-4">
+              {resumeData.sectionCompleteness.summary > 0 && (
               <CircularProgress 
                 value={resumeData.sectionCompleteness.summary} 
                 label="Summary" 
                 color="#3B82F6"
                 delay={500}
               />
+              )}
+              {resumeData.sectionCompleteness.skills > 0 && (
               <CircularProgress 
                 value={resumeData.sectionCompleteness.skills} 
                 label="Skills" 
                 color="#10B981"
                 delay={600}
               />
+              )}
+              {resumeData.sectionCompleteness.projects > 0 && (
               <CircularProgress 
                 value={resumeData.sectionCompleteness.projects} 
                 label="Projects" 
                 color="#8B5CF6"
                 delay={700}
               />
+              )}
+              {resumeData.sectionCompleteness.certifications > 0 && (
               <CircularProgress 
                 value={resumeData.sectionCompleteness.certifications} 
                 label="Certifications" 
                 color="#F59E0B"
                 delay={800}
               />
+              )}
+              {resumeData.sectionCompleteness.achievements > 0 && (
               <CircularProgress 
                 value={resumeData.sectionCompleteness.achievements} 
                 label="Achievements" 
                 color="#EC4899"
                 delay={900}
               />
+              )}
             </div>
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       {/* ================================ */}
       {/* SECTION 5: TECHNOLOGY USAGE */}
       {/* ================================ */}
+      {/* Only show if there is technology usage data */}
+      {techUsageData.length > 0 && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -962,10 +989,13 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       {/* ================================ */}
       {/* SECTION 6: AI CAREER INSIGHTS */}
       {/* ================================ */}
+      {/* Only show if there is any insight data */}
+      {(resumeData.aiInsights.bestFitRole || resumeData.aiInsights.strongAreas.length > 0 || resumeData.aiInsights.skillGaps.length > 0 || (resumeData.jobMatch && (resumeData.jobMatch.matchedSkills.length > 0 || resumeData.jobMatch.missingSkills.length > 0))) && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -983,6 +1013,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Best Fit Role */}
               <div className="space-y-4">
+                {resumeData.aiInsights.bestFitRole && (
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <p className="text-xs text-muted-foreground mb-1">Best Fit Role</p>
                   <div className="flex items-center justify-between">
@@ -992,8 +1023,10 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                     </Badge>
                   </div>
                 </div>
+                )}
 
                 {/* Strong Areas */}
+                {resumeData.aiInsights.strongAreas.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2 flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -1005,8 +1038,10 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Skill Gaps */}
+                {resumeData.aiInsights.skillGaps.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -1018,10 +1053,11 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                     ))}
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Job Match */}
-              {resumeData.jobMatch && (
+              {resumeData.jobMatch && (resumeData.jobMatch.matchedSkills.length > 0 || resumeData.jobMatch.missingSkills.length > 0) && (
                 <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-sm font-medium">Job Match Analysis</p>
@@ -1031,6 +1067,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                   </div>
                   
                   <div className="space-y-4">
+                    {resumeData.jobMatch.matchedSkills.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Matched Skills</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -1039,7 +1076,9 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                         ))}
                       </div>
                     </div>
+                    )}
                     
+                    {resumeData.jobMatch.missingSkills.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Missing Skills</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -1048,6 +1087,7 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
                         ))}
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1055,26 +1095,27 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3 justify-center">
         <Button variant="outline" asChild>
-          <a href="/dashboard/analysis">
+          <Link to="/dashboard/analysis">
             <FileText className="h-4 w-4 mr-2" />
             Re-analyze Resume
-          </a>
+          </Link>
         </Button>
         <Button variant="outline" asChild>
-          <a href="/dashboard/ats">
+          <Link to="/dashboard/ats">
             <Target className="h-4 w-4 mr-2" />
             Check ATS Score
-          </a>
+          </Link>
         </Button>
         <Button variant="outline" asChild>
-          <a href="/dashboard/roadmap">
+          <Link to="/dashboard/roadmap">
             <TrendingUp className="h-4 w-4 mr-2" />
             Career Roadmap
-          </a>
+          </Link>
         </Button>
       </div>
     </div>
