@@ -116,25 +116,38 @@ ${safeJobDescription ? `Job Description:\n${safeJobDescription}` : ""}
 
 Return this JSON structure:
 {
-  "profileSummary": "2-3 sentence summary",
+  "profileSummary": "2-3 sentence summary in simple language",
   "coreSkills": ["skill1", "skill2"],
   "softSkills": ["skill1"],
   "missingSkills": ["skill1"],
   "matchScore": 75,
   "ATSScore": 70,
   "careerLevel": "Junior|Mid|Senior",
-  "strengths": ["strength1"],
-  "weaknesses": ["weakness1"],
-  "improvementSuggestions": ["suggestion1"],
+  "suggestedCareerFields": ["Field1", "Field2"],
+  "strengths": ["strength1 in simple language", "strength2 in simple language", "strength3 in simple language"],
+  "weaknesses": ["area1 in simple language", "area2 in simple language", "area3 in simple language"],
+  "improvementSuggestions": ["suggestion1", "suggestion2"],
+  "suggestedProjects": [{"title": "Project Name", "description": "Brief description"}, {"title": "Project 2", "description": "Brief description"}, {"title": "Project 3", "description": "Brief description"}],
+  "certifications": ["Certification1", "Certification2"],
+  "marketDemandLevel": "High|Medium|Low",
   "estimatedSalaryRange": "₹3,00,000 - ₹6,00,000",
-  "skillCategories": {"frontend": 30, "backend": 25, "database": 15, "cloud": 10, "tools": 10, "softSkills": 10},
-  "skillProficiency": {"skill": 8},
-  "experience": {"internships": 0, "freelance": 0, "fullTime": 0, "academicProjects": 2, "totalYears": 0},
-  "aiInsights": {"bestFitRole": "Role", "bestFitScore": 80, "skillGaps": ["skill"], "strongAreas": ["area"]},
-  "jobMatch": {"score": 75, "matchedSkills": ["skill"], "missingSkills": ["skill"]}
+  "thirtyDayRoadmap": [{"week": 1, "tasks": ["task1", "task2"]}, {"week": 2, "tasks": ["task1"]}, {"week": 3, "tasks": ["task1"]}, {"week": 4, "tasks": ["task1"]}],
+  "resumeRewriteSuggestions": ["tip1", "tip2"],
+  "jobSearchKeywords": ["keyword1"],
+  "relatedJobTitles": [{"title": "Real Job Title", "description": "Brief description of role"}, {"title": "Real Job Title 2", "description": "Brief description"}, {"title": "Real Job Title 3", "description": "Brief description"}],
+  "keyActions": ["action1", "action2"],
+  "skillsToFocus": ["skill1", "skill2"],
+  "bestCareerDirection": "Clear career direction recommendation",
+  "riskFactors": ["risk1", "risk2"]
 }
 
-Be concise. Estimate scores 0-100.`;
+IMPORTANT:
+- Exactly 3 strengths in simple, easy-to-understand language
+- Exactly 3 areas of improvement (weaknesses) in simple language
+- At least 2 improvement suggestions
+- Exactly 3 suggested projects maximum
+- Exactly 3 real, current job titles that match the resume profile
+- Be concise. Estimate scores 0-100. Include 4 weeks in roadmap with 2-3 tasks each.`;
 
     let content = "";
     try {

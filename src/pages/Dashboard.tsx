@@ -31,17 +31,28 @@ const DashboardOverview = () => {
 const ResumeAnalysisPage = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Debug: Log when component renders
+  useEffect(() => {
+    console.log("ResumeAnalysisPage mounted");
+    return () => console.log("ResumeAnalysisPage unmounted");
+  }, []);
 
   const handleAnalyze = async (data: { resumeText: string; jobDescription: string; targetRole: string; location: string }) => {
+    console.log("handleAnalyze called with data:", { hasResumeText: !!data.resumeText, resumeLength: data.resumeText?.length });
     setLoading(true);
     setResults(null);
+    setError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast({ title: "Error", description: "Please sign in first", variant: "destructive" });
+        setLoading(false);
         return;
       }
 
+      console.log("Calling analyze-resume function...");
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
         method: "POST",
         headers: {
@@ -51,16 +62,29 @@ const ResumeAnalysisPage = () => {
         body: JSON.stringify(data),
       });
 
+      console.log("Response status:", resp.status);
+      
       if (!resp.ok) {
         const err = await resp.json();
+        console.error("API error:", err);
         throw new Error(err.error || "Analysis failed");
       }
 
-      const { results: r } = await resp.json();
+      const responseData = await resp.json();
+      console.log("Response data:", responseData);
+      
+      const { results: r } = responseData;
+      console.log("Results extracted:", r);
+      
+      if (!r) {
+        throw new Error("No results returned from analysis");
+      }
+      
       setResults(r);
       toast({ title: "Analysis Complete!", description: `Match Score: ${r.matchScore}%` });
     } catch (e: any) {
-      console.error(e);
+      console.error("Analysis error:", e);
+      setError(e.message || "Analysis failed");
       toast({ title: "Analysis Failed", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -68,8 +92,16 @@ const ResumeAnalysisPage = () => {
   };
 
   return (
-    <>
+    <div className="space-y-6">
       <AnalysisCard onAnalyze={handleAnalyze} loading={loading} />
+      
+      {/* Debug info */}
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-red-500 font-medium">Error: {error}</p>
+        </div>
+      )}
+      
       <AnimatePresence>
         {loading && (
           <motion.div
@@ -98,12 +130,13 @@ const ResumeAnalysisPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      
       {results && (
         <div className="mt-6">
           <ResultsDisplay results={results} />
         </div>
       )}
-    </>
+    </div>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   FileText, Target, Briefcase, Calendar, TrendingUp, Award, 
@@ -558,56 +559,32 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
               Welcome, <span className="text-primary">{profile?.full_name?.split(" ")[0] || "User"}</span>!
             </h1>
             <p className="text-muted-foreground mt-1">
-              {analysisInProgress ? "Analyzing your resume..." : "Upload your resume to see analytics"}
+              Analyze your resume to see personalized insights
             </p>
           </div>
         </div>
 
         <Card className="border border-dashed border-border/50 bg-card/30">
           <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            {analysisInProgress ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                  className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
-                >
-                  <Sparkles className="h-10 w-10 text-primary" />
-                </motion.div>
-                <h3 className="text-xl font-semibold mb-2">Analyzing Your Resume</h3>
-                <p className="text-muted-foreground mb-6 max-w-md">
-                  AI is analyzing your skills and experience. This usually takes 10-20 seconds.
-                </p>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <motion.div
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                  >
-                    Processing...
-                  </motion.div>
-                </div>
-              </>
-            ) : (
-              <>
-                <motion.div
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                  className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
-                >
-                  <FileText className="h-10 w-10 text-primary" />
-                </motion.div>
-                <h3 className="text-xl font-semibold mb-2">No Resume Data Yet</h3>
-                <p className="text-muted-foreground mb-6 max-w-md">
-                  Complete your profile and upload your resume to see detailed insights about your skills and experience.
-                </p>
-                <Button asChild>
-                  <a href="/dashboard/profile">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Complete Profile
-                  </a>
-                </Button>
-              </>
-            )}
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+              className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4"
+            >
+              <FileText className="h-10 w-10 text-primary" />
+            </motion.div>
+            <h3 className="text-xl font-semibold mb-2">No Resume Analysis Yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Use our AI-powered Resume Analysis Engine to get detailed insights about your skills, experience, and career recommendations.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild size="lg" className="btn-glow">
+                <Link to="/dashboard/analysis">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Analyze Your Resume
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -629,6 +606,12 @@ const ResumeAnalyticsDashboard = ({ profile }: ResumeAnalyticsDashboardProps) =>
           <p className="text-muted-foreground mt-1">Your Resume Analytics Dashboard</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/analysis">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Re-Analyze Resume
+            </Link>
+          </Button>
           {profile?.skillmirror_id && (
             <Badge variant="outline" className="font-mono text-xs border-primary/30">
               ID: {profile.skillmirror_id}
