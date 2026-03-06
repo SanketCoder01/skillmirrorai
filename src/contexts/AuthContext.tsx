@@ -9,6 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null; needsVerification: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<{ error: string | null; success: boolean }>;
   profile: { 
     display_name: string; 
     email: string; 
@@ -159,7 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/login?verified=true`,
         data: { display_name: displayName },
       },
     });
@@ -178,6 +179,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login?verified=true`,
+      },
+    });
+    return { error: error?.message ?? null, success: !error };
   };
 
   const signOut = async () => {
@@ -215,7 +227,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, profile, refreshProfile, generateSkillMirrorId }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resendVerificationEmail, profile, refreshProfile, generateSkillMirrorId }}>
       {children}
     </AuthContext.Provider>
   );

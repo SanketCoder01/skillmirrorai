@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,10 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn, user, loading: authLoading } = useAuth();
+  const [resendLoading, setResendLoading] = useState(false);
+  const [showResendOption, setShowResendOption] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const { signIn, resendVerificationEmail, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -28,6 +31,7 @@ const Login = () => {
   useEffect(() => {
     const reason = searchParams.get("reason");
     const verification = searchParams.get("verification");
+    const verified = searchParams.get("verified");
     
     if (reason === "inactive") {
       toast({
@@ -43,11 +47,19 @@ const Login = () => {
         description: "Please check your email inbox (and spam folder) for the confirmation link. You must verify your email before signing in.",
       });
     }
+
+    if (verified === "true") {
+      toast({
+        title: "Email Verified Successfully!",
+        description: "Your email has been verified. You can now sign in to your account.",
+      });
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setShowResendOption(false);
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
@@ -58,12 +70,35 @@ const Login = () => {
           description: "Please check your email and click the confirmation link before signing in. Check your spam folder if you don't see it.", 
           variant: "destructive" 
         });
+        setShowResendOption(true);
+        setUnverifiedEmail(email);
       } else {
         toast({ title: "Sign in failed", description: error, variant: "destructive" });
       }
     } else {
       const next = searchParams.get("next");
       navigate(next && next.startsWith("/") ? next : "/dashboard");
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!unverifiedEmail) return;
+    setResendLoading(true);
+    const { error, success } = await resendVerificationEmail(unverifiedEmail);
+    setResendLoading(false);
+    
+    if (success) {
+      toast({
+        title: "Verification Email Sent!",
+        description: "Please check your inbox (and spam folder) for the verification link.",
+      });
+      setShowResendOption(false);
+    } else {
+      toast({
+        title: "Failed to Resend",
+        description: error || "Could not resend verification email. Please try again later.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -112,6 +147,32 @@ const Login = () => {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          
+          {/* Resend Verification Email Option */}
+          {showResendOption && (
+            <div className="mt-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-amber-500 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-600">Email not verified yet?</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click the link in your email, or resend the verification link.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="mt-2 border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+                  >
+                    {resendLoading ? "Sending..." : "Resend Verification Email"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <p className="text-center text-muted-foreground text-sm mt-6">
             Don't have an account?{" "}
             <Link to="/register" className="text-primary hover:underline">Create one</Link>

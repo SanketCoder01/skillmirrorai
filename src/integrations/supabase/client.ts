@@ -24,7 +24,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true, // Enable to handle email verification callbacks
     // Use custom lock to prevent AbortError from navigator.locks
     lock: customLock,
   },
