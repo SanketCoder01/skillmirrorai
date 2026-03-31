@@ -1,35 +1,40 @@
-import { LayoutDashboard, History, FileText, Settings, LogOut, ShieldCheck, PenTool, Shield, Trophy, Map, Award, MessageSquare, User } from "lucide-react";
+import { LayoutDashboard, History, FileText, LogOut, ShieldCheck, PenTool, Map, Award, User, Sparkles, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
-import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const items = [
+// Sidebar items organized into sections
+const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Profile", url: "/dashboard/profile", icon: User },
-  { title: "Inbox", url: "/dashboard/inbox", icon: MessageSquare },
+];
+
+const resumeItems = [
   { title: "Resume Analysis", url: "/dashboard/analysis", icon: FileText },
-  { title: "Resume Verifier", url: "/dashboard/verifier", icon: Shield },
-  { title: "Skill Test", url: "/dashboard/skill-test", icon: Trophy },
-  { title: "Roadmap", url: "/dashboard/roadmap", icon: Map },
-  { title: "Certificate", url: "/dashboard/certificate", icon: Award },
   { title: "ATS Score", url: "/dashboard/ats", icon: ShieldCheck },
   { title: "Resume Optimizer", url: "/dashboard/rewriter", icon: PenTool },
+];
+
+const growthItems = [
+  { title: "Roadmap", url: "/dashboard/roadmap", icon: Map },
+  { title: "Certificates", url: "/dashboard/certificate", icon: Award },
+];
+
+const historyItems = [
   { title: "History", url: "/dashboard/history", icon: History },
-  { title: "Reports", url: "/dashboard/reports", icon: FileText },
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
+  { title: "Reports", url: "/dashboard/reports", icon: BarChart3 },
 ];
 
 export function DashboardSidebar() {
@@ -37,47 +42,6 @@ export function DashboardSidebar() {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (user) {
-      fetchUnreadCount();
-      
-      // Subscribe to new messages
-      const channel = supabase
-        .channel('student-messages-sidebar')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages'
-          },
-          () => {
-            fetchUnreadCount();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user]);
-
-  const fetchUnreadCount = async () => {
-    if (!user) return;
-
-    const { count, error } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("receiver_id", user.id)
-      .is("read_at", null);
-
-    if (!error) {
-      setUnreadCount(count || 0);
-    }
-  };
 
   const handleLogout = async () => {
     await signOut();
@@ -89,7 +53,7 @@ export function DashboardSidebar() {
       <SidebarContent className="bg-card/60 backdrop-blur-xl border-r border-border/30 pt-4">
         {/* User Profile Header */}
         {!collapsed && (
-          <div className="px-3 pb-4 border-b border-border/30 mb-4">
+          <div className="px-3 pb-4 border-b border-border/30 mb-2">
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 border-2 border-primary/20">
                 <AvatarImage src={profile?.avatar_url || undefined} />
@@ -105,26 +69,86 @@ export function DashboardSidebar() {
           </div>
         )}
         
+        {/* Main Section */}
         <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel className="text-xs text-muted-foreground px-3 mb-1">Main</SidebarGroupLabel>}
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
-              {items.map((item) => (
+            <SidebarMenu className="space-y-1">
+              {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors" activeClassName="bg-primary/10 text-primary font-medium">
-                      <div className="relative">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {item.title === "Inbox" && unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
-                            {unreadCount > 9 ? "9+" : unreadCount}
-                          </span>
-                        )}
-                      </div>
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Resume Tools Section */}
+        <SidebarGroup className="mt-2">
+          {!collapsed && <SidebarGroupLabel className="text-xs text-muted-foreground px-3 mb-1">Resume Tools</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {resumeItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors" activeClassName="bg-primary/10 text-primary font-medium">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Growth Section */}
+        <SidebarGroup className="mt-2">
+          {!collapsed && <SidebarGroupLabel className="text-xs text-muted-foreground px-3 mb-1">Growth</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {growthItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors" activeClassName="bg-primary/10 text-primary font-medium">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* History Section */}
+        <SidebarGroup className="mt-2">
+          {!collapsed && <SidebarGroupLabel className="text-xs text-muted-foreground px-3 mb-1">History</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {historyItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground transition-colors" activeClassName="bg-primary/10 text-primary font-medium">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Logout */}
+        <SidebarGroup className="mt-4">
+          <SidebarGroupContent>
+            <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleLogout} className="hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center gap-3 px-3 py-2 rounded-md text-sm cursor-pointer">
                   <LogOut className="h-4 w-4 shrink-0" />

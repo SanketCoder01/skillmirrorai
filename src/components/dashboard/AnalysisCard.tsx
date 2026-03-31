@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { motion } from "framer-motion";
 
 interface AnalysisCardProps {
@@ -60,12 +61,18 @@ export function AnalysisCard({ onAnalyze, loading }: AnalysisCardProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card p-6"
     >
-      <h2 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-primary" />
-        Resume Analysis Engine
-      </h2>
+      <Card className="border border-border/50 bg-card/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Resume Analysis Engine
+          </CardTitle>
+          <CardDescription>
+            Upload your resume and get AI-powered career insights
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
       {/* Upload zone */}
       <div
@@ -121,6 +128,8 @@ export function AnalysisCard({ onAnalyze, loading }: AnalysisCardProps) {
           <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Run AI Career Analysis</span>
         )}
       </Button>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }

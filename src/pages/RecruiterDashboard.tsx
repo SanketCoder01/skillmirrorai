@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   Search, Filter, MapPin, GraduationCap, Star, Eye, 
   Users, Shield, Download, X,
-  ChevronDown, CheckCircle, AlertTriangle
+  ChevronDown, CheckCircle, AlertTriangle, MessageSquare, 
+  FileText, Linkedin, Github, Paperclip, Send, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,11 +35,13 @@ interface Candidate {
   skillmirror_id: string;
   full_name: string;
   email: string;
+  avatar_url?: string | null;
+  resume_url?: string | null;
   university: string;
   course: string;
   graduation_year: number;
   country: string;
-  linkedin: string | null;
+  linkedin_url: string | null;
   github: string | null;
   candidate_score: number;
   risk_score: number;
@@ -75,6 +80,10 @@ const RecruiterDashboard = () => {
   });
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [stats, setStats] = useState({
     totalCandidates: 0,
     verifiedCandidates: 0,
@@ -83,6 +92,7 @@ const RecruiterDashboard = () => {
   });
   
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -90,6 +100,23 @@ const RecruiterDashboard = () => {
       fetchCandidates();
     }
   }, [user]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('recruiter-dashboard-profiles')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          fetchCandidates();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     applyFilters();
@@ -122,11 +149,13 @@ const RecruiterDashboard = () => {
           skillmirror_id,
           full_name,
           email,
+          avatar_url,
+          resume_url,
           university,
           course,
           graduation_year,
           country,
-          linkedin,
+          linkedin_url,
           github,
           candidate_score,
           risk_score,
@@ -245,6 +274,75 @@ const RecruiterDashboard = () => {
       graduationYear: "",
     });
     setSearchQuery("");
+  };
+
+  const handleOpenMessage = () => {
+    if (!selectedCandidate) return;
+    setShowMessageDialog(true);
+  };
+
+  const handleSendMessage = async () => {
+    if (!user || !selectedCandidate || (!messageText.trim() && !attachmentFile)) return;
+    
+    setSendingMessage(true);
+    try {
+      let attachmentUrl: string | null = null;
+      let attachmentName: string | null = null;
+
+      // Upload attachment if exists
+      if (attachmentFile) {
+        const fileExt = attachmentFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}_${attachmentFile.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('message-attachments')
+          .upload(fileName, attachmentFile);
+        
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast({ title: "Failed to upload file", variant: "destructive" });
+          setSendingMessage(false);
+          return;
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('message-attachments')
+          .getPublicUrl(fileName);
+        
+        attachmentUrl = publicUrl;
+        attachmentName = attachmentFile.name;
+      }
+
+      // Send message
+      const { error } = await supabase
+        .from("messages")
+        .insert({
+          sender_id: user.id,
+          receiver_id: selectedCandidate.user_id,
+          content: messageText.trim() || (attachmentFile ? `📎 ${attachmentFile.name}` : ""),
+          attachment_url: attachmentUrl,
+          attachment_name: attachmentName,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Message Sent",
+        description: `Your message has been sent to ${selectedCandidate.full_name}`,
+      });
+      
+      setMessageText("");
+      setAttachmentFile(null);
+      setShowMessageDialog(false);
+      
+      // Navigate to inbox to see the conversation
+      navigate("/recruiter/inbox");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({ title: "Failed to send message", variant: "destructive" });
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   return (
@@ -492,13 +590,23 @@ const RecruiterDashboard = () => {
             {selectedCandidate && (
               <>
                 <DialogHeader>
-                  <DialogTitle className="flex items-center justify-between">
-                    <span>{selectedCandidate.full_name}</span>
-                    {getVerificationBadge(selectedCandidate.verification_status)}
+                  <DialogTitle className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={selectedCandidate.avatar_url || undefined} />
+                      <AvatarFallback className="text-lg">
+                        {selectedCandidate.full_name?.charAt(0).toUpperCase() || "S"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span>{selectedCandidate.full_name}</span>
+                        {getVerificationBadge(selectedCandidate.verification_status)}
+                      </div>
+                      <DialogDescription className="font-mono mt-1">
+                        {selectedCandidate.skillmirror_id}
+                      </DialogDescription>
+                    </div>
                   </DialogTitle>
-                  <DialogDescription className="font-mono">
-                    {selectedCandidate.skillmirror_id}
-                  </DialogDescription>
                 </DialogHeader>
                 
                 <div className="space-y-6">
@@ -542,25 +650,108 @@ const RecruiterDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    {selectedCandidate.linkedin && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={selectedCandidate.linkedin} target="_blank" rel="noopener noreferrer">
-                          LinkedIn
-                        </a>
-                      </Button>
-                    )}
-                    {selectedCandidate.github && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={selectedCandidate.github} target="_blank" rel="noopener noreferrer">
-                          GitHub
-                        </a>
-                      </Button>
-                    )}
+                  {/* Profile Links Section */}
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium mb-3">Profile Links</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCandidate.linkedin_url && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedCandidate.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                            <Linkedin className="h-4 w-4 text-blue-600" />
+                            LinkedIn Profile
+                          </a>
+                        </Button>
+                      )}
+                      {selectedCandidate.github && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedCandidate.github} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                            <Github className="h-4 w-4" />
+                            GitHub Profile
+                          </a>
+                        </Button>
+                      )}
+                      {selectedCandidate.resume_url && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedCandidate.resume_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-red-500" />
+                            View Resume
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Message Button */}
+                  <div className="border-t pt-4">
+                    <Button onClick={handleOpenMessage} className="w-full btn-glow">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Message Student
+                    </Button>
                   </div>
                 </div>
               </>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Message Dialog */}
+        <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Message {selectedCandidate?.full_name}
+              </DialogTitle>
+              <DialogDescription>
+                Send a message to this student. They will receive it in real-time.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <Textarea
+                placeholder="Type your message here..."
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+              
+              <div>
+                <label className="text-sm text-muted-foreground mb-2 block">
+                  Attach file (PDF, DOCX, JPG)
+                </label>
+                <Input
+                  type="file"
+                  accept=".pdf,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                  className="cursor-pointer"
+                />
+                {attachmentFile && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Selected: {attachmentFile.name}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowMessageDialog(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button onClick={handleSendMessage} disabled={sendingMessage || (!messageText.trim() && !attachmentFile)} className="flex-1 btn-glow">
+                  {sendingMessage ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Message
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

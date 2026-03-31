@@ -13,8 +13,8 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Set PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Set PDF.js worker - use the version-specific CDN URL
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface VerificationResult {
   overall_score: number;
@@ -54,20 +54,34 @@ const DashboardVerifier = () => {
   const { user } = useAuth();
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(" ");
-      fullText += pageText + "\n";
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(" ");
+        fullText += pageText + "\n";
+      }
+      
+      return fullText.trim();
+    } catch (error) {
+      console.error("PDF.js extraction error:", error);
+      // Fallback: try to read as text
+      try {
+        const text = await file.text();
+        if (text && text.length > 50) {
+          return text;
+        }
+      } catch (textError) {
+        console.error("Text fallback also failed:", textError);
+      }
+      throw new Error("Could not extract text from PDF. The file may be encrypted or corrupted.");
     }
-    
-    return fullText.trim();
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -178,10 +192,13 @@ const DashboardVerifier = () => {
       // Call verification function
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast({ title: "Error", description: "Please sign in first", variant: "destructive" });
+        toast({ title: "Session Expired", description: "Please sign in again", variant: "destructive" });
+        setLoading(false);
         return;
       }
 
+      console.log("Calling verify-resume function...");
+      
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-resume`, {
         method: "POST",
         headers: {
@@ -197,37 +214,48 @@ const DashboardVerifier = () => {
       });
 
       if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Verification failed");
+        const errData = await resp.json().catch(() => ({}));
+        console.error("Verification API error:", resp.status, errData);
+        
+        if (resp.status === 401) {
+          toast({ title: "Session Expired", description: "Please sign in again", variant: "destructive" });
+          return;
+        }
+        throw new Error(errData.error || `Server error (${resp.status})`);
       }
 
       const { results: verificationResults } = await resp.json();
       setResults(verificationResults);
 
       // Save to resumes table
-      await supabase.from("resumes").insert({
-        user_id: user.id,
-        file_name: file?.name || "resume.pdf",
-        file_url: fileUrl,
-        parsed_text: parsedText,
-        skills_detected: verificationResults.skills_detected,
-        experience: verificationResults.experience_summary,
-        education: verificationResults.education,
-        projects: verificationResults.projects,
-        analysis_result: verificationResults,
-        is_verified: verificationResults.is_verified,
-        verification_score: verificationResults.overall_score,
-      });
+      try {
+        await supabase.from("resumes").insert({
+          user_id: user.id,
+          file_name: file?.name || "resume.pdf",
+          file_url: fileUrl,
+          parsed_text: parsedText,
+          skills_detected: verificationResults.skills_detected,
+          experience: verificationResults.experience_summary,
+          education: verificationResults.education,
+          projects: verificationResults.projects,
+          analysis_result: verificationResults,
+          is_verified: verificationResults.is_verified,
+          verification_score: verificationResults.overall_score,
+        });
+      } catch (dbError) {
+        console.error("Failed to save to database:", dbError);
+        // Don't fail the whole operation if DB save fails
+      }
 
       toast({
         title: "Verification Complete!",
         description: `Overall Score: ${verificationResults.overall_score}%`,
       });
     } catch (e: any) {
-      console.error(e);
+      console.error("Verification error:", e);
       toast({
         title: "Verification Failed",
-        description: e.message,
+        description: e.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {

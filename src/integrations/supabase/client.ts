@@ -11,8 +11,8 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Custom lock function that bypasses navigator.locks to prevent AbortError in dev mode
 // Must be generic to match Supabase's LockFunc type
 const customLock = async <R,>(
-  _name: string, 
-  _acquireTimeout: number, 
+  _name: string,
+  _acquireTimeout: number,
   acquire: () => Promise<R>
 ): Promise<R> => {
   // Bypass navigator.locks - just call acquire directly
@@ -24,8 +24,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true, // Enable to handle email verification callbacks
     // Use custom lock to prevent AbortError from navigator.locks
     lock: customLock,
+  },
+  global: {
+    headers: {
+      'x-request-timeout': '30000', // 30 second timeout
+    },
   },
 });

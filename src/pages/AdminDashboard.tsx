@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { 
   Users, Building2, CheckCircle, XCircle, Clock, Mail, 
-  Search, Award, Shield, TrendingUp, Eye, Send, LogOut, Phone, MapPin
+  Search, Award, Shield, TrendingUp, Eye, Send, LogOut, Phone, MapPin,
+  FileText, Linkedin
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -24,6 +25,17 @@ interface Student {
   candidate_score: number | null;
   risk_score: number | null;
   skill_authenticity_score: number | null;
+  avatar_url: string | null;
+  resume_url: string | null;
+  linkedin_url: string | null;
+}
+
+interface StudentCertificate {
+  id: string;
+  certificate_name: string;
+  issuing_company: string;
+  issue_date: string;
+  certificate_image_url: string | null;
 }
 
 interface RecruiterRequest {
@@ -51,6 +63,8 @@ const AdminDashboard = () => {
   const [searchRecruiter, setSearchRecruiter] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentCertificates, setStudentCertificates] = useState<StudentCertificate[]>([]);
+  const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +132,33 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem("admin_session");
     window.location.href = "/admin/login";
+  };
+
+  // Fetch certificates for selected student
+  const fetchStudentCertificates = async (userId: string) => {
+    setLoadingCertificates(true);
+    try {
+      const { data, error } = await supabase
+        .from("user_certificates")
+        .select("id, certificate_name, issuing_company, issue_date, certificate_image_url")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setStudentCertificates(data || []);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      setStudentCertificates([]);
+    } finally {
+      setLoadingCertificates(false);
+    }
+  };
+
+  // Handle student selection
+  const handleSelectStudent = (student: Student) => {
+    setSelectedStudent(student);
+    setStudentCertificates([]);
+    fetchStudentCertificates(student.user_id);
   };
 
   const fetchData = async () => {
@@ -621,7 +662,7 @@ const AdminDashboard = () => {
                             </Badge>
                           </td>
                           <td className="py-3 px-4">
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedStudent(student)}>
+                            <Button variant="ghost" size="sm" onClick={() => handleSelectStudent(student)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           </td>
@@ -637,40 +678,59 @@ const AdminDashboard = () => {
 
         {/* Student Detail Modal */}
         {selectedStudent && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl border border-border/50 bg-card">
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <Card className="w-full max-w-3xl border border-border/50 bg-card my-8">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Student Details</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Student Details
+                </CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedStudent(null)}>✕</Button>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
+                {/* Profile Header with Avatar */}
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                    {(selectedStudent.full_name?.[0] || "U").toUpperCase()}
-                  </div>
+                  {selectedStudent.avatar_url ? (
+                    <img 
+                      src={selectedStudent.avatar_url} 
+                      alt={selectedStudent.full_name || "Student"}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-primary/20"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                      {(selectedStudent.full_name?.[0] || "U").toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-xl font-semibold">{selectedStudent.full_name}</h3>
-                    <p className="font-mono text-primary">{selectedStudent.skillmirror_id}</p>
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-primary" />
+                      <span className="font-mono text-primary text-sm">{selectedStudent.skillmirror_id}</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Contact & Academic Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="font-medium">{selectedStudent.email}</p>
+                    <p className="font-medium text-sm">{selectedStudent.email}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">University</p>
-                    <p className="font-medium">{selectedStudent.university || "-"}</p>
+                    <p className="font-medium text-sm">{selectedStudent.university || "-"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Course</p>
-                    <p className="font-medium">{selectedStudent.course || "-"}</p>
+                    <p className="font-medium text-sm">{selectedStudent.course || "-"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Country</p>
-                    <p className="font-medium">{selectedStudent.country || "-"}</p>
+                    <p className="font-medium text-sm">{selectedStudent.country || "-"}</p>
                   </div>
                 </div>
+
+                {/* Scores */}
                 <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
                   <div className="text-center p-3 rounded-lg bg-muted/30">
                     <p className="text-xs text-muted-foreground">Candidate Score</p>
@@ -684,6 +744,103 @@ const AdminDashboard = () => {
                     <p className="text-xs text-muted-foreground">Authenticity</p>
                     <p className="text-2xl font-bold text-green-500">{selectedStudent.skill_authenticity_score || 0}%</p>
                   </div>
+                </div>
+
+                {/* Student Uploads - Admin Only */}
+                <div className="pt-4 border-t border-border/50">
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Student Uploads (Admin Only)
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    {/* Resume */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Resume</span>
+                      </div>
+                      {selectedStudent.resume_url ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedStudent.resume_url} target="_blank" rel="noopener noreferrer">
+                            <Eye className="h-3 w-3 mr-1" />
+                            View Resume
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not uploaded</span>
+                      )}
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <Linkedin className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">LinkedIn Profile</span>
+                      </div>
+                      {selectedStudent.linkedin_url ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedStudent.linkedin_url} target="_blank" rel="noopener noreferrer">
+                            <Eye className="h-3 w-3 mr-1" />
+                            View Profile
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not provided</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Certificates */}
+                <div className="pt-4 border-t border-border/50">
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Certificates ({studentCertificates.length})
+                  </h4>
+                  
+                  {loadingCertificates ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  ) : studentCertificates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">No certificates uploaded</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {studentCertificates.map((cert) => (
+                        <div key={cert.id} className="p-3 rounded-lg border border-border/50 bg-muted/20">
+                          <div className="flex items-start gap-3">
+                            {cert.certificate_image_url ? (
+                              <img 
+                                src={cert.certificate_image_url} 
+                                alt={cert.certificate_name}
+                                className="w-16 h-16 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
+                                <FileText className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{cert.certificate_name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{cert.issuing_company}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(cert.issue_date).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          {cert.certificate_image_url && (
+                            <Button variant="ghost" size="sm" className="mt-2 w-full" asChild>
+                              <a href={cert.certificate_image_url} target="_blank" rel="noopener noreferrer">
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Certificate
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

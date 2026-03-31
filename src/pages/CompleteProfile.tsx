@@ -12,6 +12,10 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SplineBackground from "@/components/SplineBackground";
 
+// PDF.js for client-side text extraction
+import * as pdfjsLib from "pdfjs-dist";
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 const CURRENT_YEAR = new Date().getFullYear();
 const GRADUATION_YEARS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR + i);
 const COUNTRIES = [
@@ -41,12 +45,13 @@ const CompleteProfile = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeText, setResumeText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, generateSkillMirrorId } = useAuth();
   const navigate = useNavigate();
 
   // Calculate profile progress
@@ -118,6 +123,25 @@ const CompleteProfile = () => {
     }));
   };
 
+  // Extract text from PDF client-side
+  const extractPdfText = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        fullText += pageText + "\n";
+      }
+      return fullText.trim();
+    } catch (error) {
+      console.error("PDF extraction error:", error);
+      return "";
+    }
+  };
+
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -136,7 +160,7 @@ const CompleteProfile = () => {
     }
   };
 
-  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
@@ -148,6 +172,14 @@ const CompleteProfile = () => {
         return;
       }
       setResumeFile(file);
+      // Extract text from PDF immediately
+      const text = await extractPdfText(file);
+      setResumeText(text);
+      if (text) {
+        toast({ title: "Resume loaded", description: `Extracted ${text.length} characters from resume` });
+      } else {
+        toast({ title: "Warning", description: "Could not extract text from PDF. Analysis may be limited.", variant: "destructive" });
+      }
     }
   };
 
@@ -173,6 +205,15 @@ const CompleteProfile = () => {
       toast({
         title: "Missing fields",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!resumeFile) {
+      toast({
+        title: "Resume Required",
+        description: "Please upload your resume/CV to complete your profile. This is mandatory for resume analysis.",
         variant: "destructive",
       });
       return;
@@ -223,7 +264,10 @@ const CompleteProfile = () => {
           bio: formData.bio || null,
           avatar_url: avatarUrl,
           resume_url: resumeUrl,
+          resume_text: resumeText, // Store extracted text for fast analysis
           role: "student",
+          profile_completed: true,
+          verification_status: "profile_completed",
         }, { onConflict: "user_id" });
 
       if (profileError) throw profileError;
@@ -250,14 +294,58 @@ const CompleteProfile = () => {
 
       setUploadProgress(100);
 
+      // Ensure SkillMirror ID is generated once profile is marked completed
+      await generateSkillMirrorId(user!.id);
       await refreshProfile();
 
       toast({
         title: "✅ Profile completed!",
-        description: "Your profile has been saved successfully.",
+        description: "Your profile has been saved. Analyzing your resume...",
       });
 
-      navigate("/dashboard");
+      // Trigger automatic resume analysis in background
+      if (resumeUrl) {
+        try {
+          // Get session for auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // Use pre-extracted text if available, otherwise the function will fetch from URL
+            const analysisPayload: any = {
+              targetRole: formData.research_interest || undefined,
+              location: formData.country,
+            };
+            
+            if (resumeText && resumeText.length > 50) {
+              // Send pre-extracted text (FAST path)
+              analysisPayload.resumeText = resumeText;
+            } else {
+              // Send URL for server-side extraction (fallback)
+              analysisPayload.resumeUrl = resumeUrl;
+            }
+            
+            console.log("Triggering analysis with payload:", analysisPayload.resumeText ? "pre-extracted text" : "URL");
+            
+            // Call analyze-resume function
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-resume`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify(analysisPayload),
+            }).then(response => response.json())
+              .then(data => console.log("Analysis response:", data))
+              .catch(err => console.error("Background analysis error:", err));
+          }
+        } catch (analysisError) {
+          console.error("Failed to start resume analysis:", analysisError);
+          // Don't block navigation if analysis fails
+        }
+      } else {
+        console.log("No resume URL, skipping analysis");
+      }
+
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       console.error("Profile completion error:", error);
       toast({
@@ -489,12 +577,13 @@ const CompleteProfile = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                <span>Resume / CV</span>
+                <span>Resume / CV *</span>
+                <span className="text-xs text-amber-500">(Required)</span>
               </div>
               
               <div 
                 onClick={() => resumeInputRef.current?.click()}
-                className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+                className="border-2 border-dashed border-primary/50 rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors bg-primary/5"
               >
                 <input
                   ref={resumeInputRef}
@@ -511,7 +600,8 @@ const CompleteProfile = () => {
                 ) : (
                   <div className="text-muted-foreground">
                     <Upload className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">Click to upload your CV (PDF, max 10MB)</p>
+                    <p className="text-sm font-medium">Click to upload your CV (PDF, max 10MB) *</p>
+                    <p className="text-xs text-amber-500 mt-1">Resume is mandatory for profile completion</p>
                   </div>
                 )}
               </div>

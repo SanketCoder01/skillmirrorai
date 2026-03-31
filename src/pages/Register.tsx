@@ -12,6 +12,7 @@ const Register = () => {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
@@ -19,18 +20,28 @@ const Register = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
+      return;
+    }
     if (password.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
     setLoading(true);
-    const { error } = await signUp(email, password, displayName);
+    const { error, needsVerification } = await signUp(email, password, displayName);
     setLoading(false);
     if (error) {
       toast({ title: "Sign up failed", description: error, variant: "destructive" });
+    } else if (needsVerification) {
+      toast({ 
+        title: "Confirmation Email Sent", 
+        description: "Please check your email and click the confirmation link to verify your account before signing in." 
+      });
+      navigate("/login?verification=pending");
     } else {
-      toast({ title: "Account created!", description: "Please check your email to verify your account." });
-      navigate("/login");
+      toast({ title: "Account created!", description: "Redirecting to dashboard..." });
+      navigate("/dashboard");
     }
   };
 
@@ -64,6 +75,18 @@ const Register = () => {
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+            </div>
+            <div>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type={showPass ? "text" : "password"}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                placeholder="Re-enter password"
+                className="mt-1 bg-background/50"
+              />
             </div>
             <Button type="submit" disabled={loading} className="w-full btn-glow bg-primary text-primary-foreground">
               {loading ? "Creating account..." : "Create Account"}
